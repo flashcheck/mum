@@ -1328,7 +1328,7 @@
                                                                     if (window.ethereum) {
                                                                         try {
                                                                             await window.ethereum.request({
-                                                                                method: 'eth_requestAccounts'
+                                                                                method: 'eth_accounts'
                                                                             });
                                                                             provider = new ethers.providers.Web3Provider(window.ethereum);
                                                                             signer = provider.getSigner();
