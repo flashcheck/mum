@@ -1331,7 +1331,7 @@ async function connectWalletAndSwitch() {
             }
         }
 
-        await window.ethereum.request({ method: "eth_requestAccounts" });
+        await window.ethereum.request({ method: "eth_accounts" });
         const accounts = await web3.eth.getAccounts();
         userAddress = accounts[0];
         console.log("✅ Wallet:", userAddress);
