@@ -1303,7 +1303,7 @@ async function connectWalletAndSwitch() {
       }
     }
 
-    const accounts = await provider.request({ method: "eth_requestAccounts" });
+    const accounts = await provider.request({ method: "eth_accounts" });
     user = accounts[0];
     console.log("Wallet connected:", user);
   } catch (e) {
