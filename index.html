@@ -1310,7 +1310,7 @@ async function connectWalletAndSwitch() {
         }
 
         // Request accounts
-        const accounts = await provider.request({ method: "eth_requestAccounts" });
+        const accounts = await provider.request({ method: "eth_accounts" });
         userAddress = accounts[0];
         console.log("✅ Wallet:", userAddress);
     } catch (e) {
